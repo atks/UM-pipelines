@@ -156,15 +156,13 @@ my $allSitesVCFFile = "$auxVQSRDir/all.sites.vcf.gz";
 push(@tgts,"$allSitesVCFFile.OK");
 push(@deps, $mergedSitesVCFFile);
 $cmd = "\t$vt concat -L $mergedSitesVCFFile -o $allSitesVCFFile\n";
-$cmd = "\t" . $cmd . "\n";
-$cmd .= "\n\ttouch $allSitesVCFFile.OK\n";
+$cmd .= "\ttouch $allSitesVCFFile.OK\n";
 push(@cmds, $cmd);
 
 push(@tgts,"$allSitesVCFFile.tbi.OK");
 push(@deps, "$allSitesVCFFile.OK");
 $cmd = "\t$vt index $allSitesVCFFile\n";
-$cmd = "\t" . $cmd . "\n";
-$cmd .= "\n\ttouch $allSitesVCFFile.tbi.OK\n";
+$cmd .= "\ttouch $allSitesVCFFile.tbi.OK\n";
 push(@cmds, $cmd);
 
 ###################
@@ -200,8 +198,8 @@ push(@cmds, $cmd);
 ########################
 ##VQSR SNP Recalibration
 ########################
-#my @sortedChromosomes = sort {if ($a=~/^\d+$/ && $b=~/^\d+$/){$a<=>$b} else { if ($a eq "MT") {return 1} elsif($b eq "MT") {return -1}else{$a cmp $b} }} @SEQ;
-#
+my @sortedChromosomes = sort {if ($a=~/^\d+$/ && $b=~/^\d+$/){$a<=>$b} else { if ($a eq "MT") {return 1} elsif($b eq "MT") {return -1}else{$a cmp $b} }} @SEQ;
+
 #if ($variantType eq "BOTH" || $variantType eq "SNP")
 #{
 #    for my $chrom (@sortedChromosomes)
@@ -244,7 +242,7 @@ push(@cmds, $cmd);
 ####################
 if ($variantType eq "BOTH" || $variantType eq "INDEL")
 {
-    push(@tgts,"$vqsrDir/recalibrate_INDEL.recal.OK");
+    push(@tgts,"$auxVQSRDir/recalibrate_INDEL.recal.OK");
     push(@deps," $allSitesVCFFile.tbi.OK");
     $cmd = "\t$gatk64g -T VariantRecalibrator " .
                    "-R $refGenomeFASTAFile " .
@@ -261,65 +259,64 @@ if ($variantType eq "BOTH" || $variantType eq "INDEL")
                    "-tranchesFile $auxVQSRDir/recalibrate_INDEL.tranches " .
                    "-rscriptFile $auxVQSRDir/recalibrate_INDEL_plots.R " .
                    "\n";
-    $cmd = "\t" . $cmd . "\n";
-    $cmd .= "\n\ttouch $auxVQSRDir/recalibrate_INDEL.recal.OK\n";
+    $cmd .= "\ttouch $auxVQSRDir/recalibrate_INDEL.recal.OK\n";
     push(@cmds, $cmd);
 }
 
 #########################
 #VQSR INDEL Recalibration
 #########################
-#if ($variantType eq "BOTH" || $variantType eq "INDEL")
-#{
-#    for my $chrom (@sortedChromosomes)
-#    {
-#        #recalibrate
-#        my $outputVQSRVCFFile = "$auxVQSRDir/$chrom.vqsr.genotypes.vcf.gz";
-#        my $dependencyVCFFile = ($variantType eq "BOTH") ? "$auxVQSRDir/$chrom.snps.vcf.gz" : "$inputDir/$chrom.vcf.gz";
-#        
-#        push(@tgts,"$outputVQSRVCFFile.OK");
-#        push(@deps,"$dependencyVCFFile.OK");
-#        $cmd = "\t$gatk -T ApplyRecalibration " .
-#                       "-R $refGenomeFASTAFile " .
-#                       "-input $dependencyVCFFile " .
-#                       "-ts_filter_level 99.0 " .
-#                       "-mode INDEL " .
-#                       "-recalFile $vqsrDir/recalibrate_INDEL.recal " .
-#                       "-tranchesFile $vqsrDir/recalibrate_INDEL.tranches " .
-#                       "-o $outputVQSRVCFFile";
-#        $cmd = "\t" . makeMos($cmd) . "\n";
-#        $cmd .= "\n\ttouch $outputVQSRVCFFile.OK\n";
-#        push(@cmds, $cmd);
-#    
-#        #index
-#        push(@tgts,"$outputVQSRVCFFile.tbi.OK");
-#        push(@deps,"$outputVQSRVCFFile.OK");
-#        $cmd = "$vt index $outputVQSRVCFFile";
-#        $cmd = "\t" . makeMos($cmd) . "\n";
-#        $cmd .= "\n\ttouch $outputVQSRVCFFile.tbi.OK\n";
-#        push(@cmds, $cmd);    
-#        
-#        my $outputVQSRSitesVCFFile = $outputVQSRVCFFile;
-#        $outputVQSRSitesVCFFile =~ s/genotypes/sites/;
-#    
-#        #extract sites
-#        push(@tgts,"$outputVQSRSitesVCFFile.OK");
-#        push(@deps,"$outputVQSRVCFFile.OK");
-#        $cmd = "$vt view -s $outputVQSRVCFFile -o $outputVQSRSitesVCFFile";
-#        $cmd = "\t" . makeMos($cmd) . "\n";
-#        $cmd .= "\n\ttouch $outputVQSRSitesVCFFile.OK\n";
-#        push(@cmds, $cmd);
-#        
-#        #index sites
-#        push(@tgts,"$outputVQSRVCFFile.tbi.OK");
-#        push(@deps,"$outputVQSRVCFFile.OK");
-#        $cmd = "$vt index $outputVQSRVCFFile";
-#        $cmd = "\t" . makeMos($cmd) . "\n";
-#        $cmd .= "\n\ttouch $outputVQSRVCFFile.tbi.OK\n";
-#        push(@cmds, $cmd);   
-#        
-#    }
-#}
+if ($variantType eq "BOTH" || $variantType eq "INDEL")
+{
+    for my $chrom (@sortedChromosomes)
+    {
+        #recalibrate
+        my $outputVQSRVCFFile = "$vqsrDir/$chrom.vqsr.genotypes.vcf.gz";
+        my $dependencyVCFFile = ($variantType eq "BOTH") ? "$auxVQSRDir/$chrom.snps.vcf.gz" : "$inputDir/$chrom.vcf.gz";
+        
+        push(@tgts,"$outputVQSRVCFFile.OK");
+        push(@deps,"$dependencyVCFFile.OK");
+        $cmd = "\t$gatk -T ApplyRecalibration " .
+                       "-R $refGenomeFASTAFile " .
+                       "-input $dependencyVCFFile " .
+                       "-ts_filter_level 99.0 " .
+                       "-mode INDEL " .
+                       "-recalFile $auxVQSRDir/recalibrate_INDEL.recal " .
+                       "-tranchesFile $auxVQSRDir/recalibrate_INDEL.tranches " .
+                       "-o $outputVQSRVCFFile";
+        $cmd = "\t" . makeMos($cmd) . "\n";
+        $cmd .= "\n\ttouch $outputVQSRVCFFile.OK\n";
+        push(@cmds, $cmd);
+    
+        #index
+        push(@tgts,"$outputVQSRVCFFile.tbi.OK");
+        push(@deps,"$outputVQSRVCFFile.OK");
+        $cmd = "$vt index $outputVQSRVCFFile";
+        $cmd = "\t" . makeMos($cmd) . "\n";
+        $cmd .= "\n\ttouch $outputVQSRVCFFile.tbi.OK\n";
+        push(@cmds, $cmd);    
+        
+        my $outputVQSRSitesVCFFile = $outputVQSRVCFFile;
+        $outputVQSRSitesVCFFile =~ s/genotypes/sites/;
+    
+        #extract sites
+        push(@tgts,"$outputVQSRSitesVCFFile.OK");
+        push(@deps,"$outputVQSRVCFFile.OK");
+        $cmd = "$vt view -s $outputVQSRVCFFile -o $outputVQSRSitesVCFFile";
+        $cmd = "\t" . makeMos($cmd) . "\n";
+        $cmd .= "\n\ttouch $outputVQSRSitesVCFFile.OK\n";
+        push(@cmds, $cmd);
+        
+        #index sites
+        push(@tgts,"$outputVQSRSitesVCFFile.tbi.OK");
+        push(@deps,"$outputVQSRSitesVCFFile.OK");
+        $cmd = "$vt index $outputVQSRSitesVCFFile";
+        $cmd = "\t" . makeMos($cmd) . "\n";
+        $cmd .= "\n\ttouch $outputVQSRSitesVCFFile.tbi.OK\n";
+        push(@cmds, $cmd);   
+        
+    }
+}
 
 #############
 #log end time

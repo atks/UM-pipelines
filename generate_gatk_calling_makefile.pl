@@ -239,7 +239,7 @@ for my $i (0 .. $#intervals)
     #interval_padding ensures that you capture Indels that lie across a boundary. Note that UnifiedGenotyper uses locuswalker.
     #--max_alternate_alleles is set at 6 by default
     
-    if ($gatk eq "UnifiedGenotyper")
+    if ($caller eq "UnifiedGenotyper")
     {
         $cmd = "\t$gatk -T UnifiedGenotyper -R $refGenomeFASTAFile -glm $variantType --interval_padding 100 -I $bamListFile --genotyping_mode DISCOVERY -o $vcfOutDir/$intervals[$i].vcf --output_mode EMIT_VARIANTS_ONLY -L $intervalFiles[$i]";
     }
