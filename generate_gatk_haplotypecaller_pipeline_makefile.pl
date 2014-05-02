@@ -322,72 +322,50 @@ $dep = "$mergedVCFFilesOK";
 @cmd = ("date | awk '{print \"end merge: \"\$\$0}' >> $logFile");
 makeLocalStep($tgt, $dep, @cmd);
 
-##############
-##log end time
-##############
-#$tgt = "$logFile.end.OK";
-#$dep = "$sampleVCFsOK";
-#@cmd = ("date | awk '{print \"end: \"\$\$0}' >> $logFile");
-#makeLocalStep($tgt, $dep, @cmd);
+#########
+#Genotype
+#########
+$tgt = "$logFile.start.genotype.OK";
+$dep = "$logFile.end.merge.OK";
+@cmd = ("date | awk '{print \"start genotype: \"\$\$0}' >> $logFile");
+makeLocalStep($tgt, $dep, @cmd);
 
+my $genotypeVCFFilesOK = "";
 
-##############
-#Call Variants
-##############
+if ($intervalWidth!=0)
+{
+    for my $interval (@intervals)
+    {
+        my $inputVCFFile = "$vcfOutDir/$interval.vcf";
+        my $outputVCFFile = "$vcfOutDir/$interval.genotypes.vcf";
+        $tgt = "$outputVCFFile.OK";
+        $dep = "";
+        @cmd = ("$gatk -T GenotypeGVCFs -R $refGenomeFASTAFile --variant $inputVCFFile -o $outputVCFFile");
+        makeStep($tgt, $dep, @cmd);
+        
+        $genotypeVCFFilesOK .= " $outputVCFFile.OK";
+    }
+}
+else
+{
+    my $inputVCFFile = "$vcfOutDir/all.vcf";
+    my $outputVCFFile = "$vcfOutDir/all.genotypes.vcf";
+    $tgt = "$outputVCFFile.OK";
+    $dep = "";
+    @cmd = ("$gatk -T CombineGVCFs -R $refGenomeFASTAFile --variant $inputVCFFile -o $outputVCFFile");
+    makeStep($tgt, $dep, @cmd);
+    
+    $genotypeVCFFilesOK = "$outputVCFFile.OK";
+}
+
+$tgt = "$logFile.end.genotype.OK";
+$dep = "$genotypeVCFFilesOK";
+@cmd = ("date | awk '{print \"end genotype: \"\$\$0}' >> $logFile");
+makeLocalStep($tgt, $dep, @cmd);
 
 ############################################
 ##Concatenate, normalize and drop duplicates
 ############################################
-#open(IN, ">$finalVCFOutDir/merge_vcf_list.txt") || die "Cannot open merge_vcf_list.txt";
-#my @sortedChromosomes = sort {if ($a=~/^\d+$/ && $b=~/^\d+$/){$a<=>$b} else { if ($a eq "MT") {return 1} elsif($b eq "MT") {return -1}else{$a cmp $b} }} keys(%intervalsByChrom);
-#for my $chrom (@sortedChromosomes)
-#{
-#    my $intervalFilesOK = join(' ', @{$intervalsByChromOK{$chrom}});
-#
-#    push(@tgts,"$finalVCFOutDir/$chrom.vcf.gz.OK");
-#    push(@deps,"$intervalFilesOK");
-#    $cmd = "$vt concat " . join(' ', @{$intervalsByChrom{$chrom}})  . " -o + | $vt normalize + -o + -r $refGenomeFASTAFile | $vt mergedups + -o $finalVCFOutDir/$chrom.vcf.gz";
-#    $cmd = "\t" . makeMos($cmd) . "\n";
-#    $cmd .= "\n\ttouch $finalVCFOutDir/$chrom.vcf.gz.OK\n";
-#    push(@cmds, $cmd);
-#
-#    print IN "$finalVCFOutDir/$chrom.vcf.gz\n";
-#}
-#close(IN);
-#
-#my $chromVCFIndicesOK = "";
-#my $chromSitesVCFIndicesOK = "";
-#for my $chrom (@sortedChromosomes)
-#{
-#    #index main file
-#    push(@tgts,"$finalVCFOutDir/$chrom.vcf.gz.tbi.OK");
-#    push(@deps,"$finalVCFOutDir/$chrom.vcf.gz.OK");
-#    $cmd = "$vt index $finalVCFOutDir/$chrom.vcf.gz";
-#    $cmd = "\t" . makeMos($cmd) . "\n";
-#    $cmd .= "\n\ttouch $finalVCFOutDir/$chrom.vcf.gz.tbi.OK\n";
-#    push(@cmds, $cmd);
-#
-#    $chromVCFIndicesOK .= " $finalVCFOutDir/$chrom.vcf.gz.tbi.OK";
-#
-#    #sites
-#    push(@tgts,"$finalVCFOutDir/$chrom.sites.vcf.gz.OK");
-#    push(@deps,"$finalVCFOutDir/$chrom.vcf.gz.tbi.OK");
-#    $cmd = "$vt view -s $finalVCFOutDir/$chrom.vcf.gz -o $finalVCFOutDir/$chrom.sites.vcf.gz";
-#    $cmd = "\t" . makeMos($cmd) . "\n";
-#    $cmd .= "\n\ttouch $finalVCFOutDir/$chrom.sites.vcf.gz.OK\n";
-#    push(@cmds, $cmd);
-#
-#    #index sites
-#    push(@tgts,"$finalVCFOutDir/$chrom.sites.vcf.gz.tbi.OK");
-#    push(@deps,"$finalVCFOutDir/$chrom.sites.vcf.gz.OK");
-#    $cmd = "$vt index $finalVCFOutDir/$chrom.sites.vcf.gz";
-#    $cmd = "\t" . makeMos($cmd) . "\n";
-#    $cmd .= "\n\ttouch $finalVCFOutDir/$chrom.sites.vcf.gz.tbi.OK\n";
-#    push(@cmds, $cmd);
-#
-#    $chromSitesVCFIndicesOK .= " $finalVCFOutDir/$chrom.sites.vcf.gz.tbi.OK";
-#}
-
 
 #*******************
 #Write out make file

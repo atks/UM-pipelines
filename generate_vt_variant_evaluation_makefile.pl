@@ -147,19 +147,26 @@ makeStep($tgt, $dep, @cmd);
 #Profile Indels
 ###############
 
+#Summary
+my $plotFile = "$plotDir/summary.pdf";
+$tgt = "$plotFile.OK";
+$dep = "$vcfDir/all.annotated.sites.bcf.OK";
+@cmd = ("$vt peek $vcfDir/all.annotated.sites.bcf -x $plotDir/tabulate_summary -y $plotFile  2> $logDir/summary.log");
+makeLocalStep($tgt, $dep, @cmd);
+
 #AFS
-my $plotFile = "$plotDir/afs.pdf";
+$plotFile = "$plotDir/afs.pdf";
 $tgt = "$plotFile.OK";
 $dep = "$vcfDir/all.annotated.sites.bcf.OK";
 @cmd = ("$vt profile_afs $vcfDir/all.annotated.sites.bcf -c VT_AC -n VT_AN -x $plotDir/plot_afs -y $plotFile  2> $logDir/profile_afs.log");
-makeStep($tgt, $dep, @cmd);
+makeLocalStep($tgt, $dep, @cmd);
 
 #HWE
 $plotFile = "$plotDir/hwe.pdf";
 $tgt = "$plotFile.OK";
 $dep = "$vcfDir/all.annotated.sites.bcf.OK";
 @cmd = ("$vt profile_hwe $vcfDir/all.annotated.sites.bcf -h VT_HWE_LPVAL -a VT_MLEAF -x $plotDir/plot_hwe -y $plotFile  2> $logDir/profile_hwe.log");
-makeStep($tgt, $dep, @cmd);
+makeLocalStep($tgt, $dep, @cmd);
 
 #Mendelian
 my $tabulateFile = "$plotDir/mendelian.pdf";
@@ -167,21 +174,22 @@ my $pedigreeFile = "/net/fantasia/home/atks/sardinia/20140421_sardinia_indel_ana
 $tgt = "$tabulateFile.OK";
 $dep = "$vcfDir/20.annotated.genotypes.bcf.OK $vcfDir/20.annotated.genotypes.bcf.csi.OK ";
 @cmd = ("$vt profile_mendelian $vcfDir/20.genotypes.bcf -f \"PASS\" -p $pedigreeFile -x $plotDir/tabulate_mendelian -y $tabulateFile  2> $logDir/profile_mendelian.log");
-makeStep($tgt, $dep, @cmd);
+makeLocalStep($tgt, $dep, @cmd);
 	
 #Overlap
 $tabulateFile = "$plotDir/indels.pdf";
 $tgt = "$tabulateFile.OK";
 $dep = "$vcfDir/all.annotated.sites.bcf.OK $vcfDir/all.annotated.sites.bcf.csi.OK ";
 @cmd = ("$vt profile_indels $vcfDir/all.annotated.sites.bcf -f \"PASS&&N_ALLELE==2&&VTYPE==INDEL\" -r $refGenomeFASTAFile -g /net/fantasia/home/atks/ref/vt/grch37/indel.reference.txt -x $plotDir/tabulate_indels -y $tabulateFile  2> $logDir/profile_indels.log");
-makeStep($tgt, $dep, @cmd);	
+makeLocalStep($tgt, $dep, @cmd);	
 	
 #length analysis
 $plotFile = "$plotDir/len.pdf";
 $tgt = "$plotFile.OK";
 $dep = "$vcfDir/all.annotated.sites.bcf.OK $vcfDir/all.annotated.sites.bcf.csi.OK ";
 @cmd = ("$vt profile_len $vcfDir/all.annotated.sites.bcf -a VT_HWEAF -b VT_AB -x $plotDir/plot_len -y $plotFile  2> $logDir/profile_len.log");
-makeStep($tgt, $dep, @cmd);	
+makeLocalStep($tgt, $dep, @cmd);	
+	
 	
 #*******************
 #Write out make file
@@ -231,6 +239,21 @@ sub makeStep
     for my $c (@cmd)
     {
         $cmd .= "\t" . makeMos($c) . "\n";
+    }
+    $cmd .= "\ttouch $tgt\n";
+    push(@cmds, $cmd);
+}
+
+sub makeLocalStep
+{
+    my ($tgt, $dep, @cmd) = @_;
+    
+    push(@tgts, $tgt);
+    push(@deps, $dep);
+    my $cmd = "";
+    for my $c (@cmd)
+    {
+        $cmd .= "\t" . $c . "\n";
     }
     $cmd .= "\ttouch $tgt\n";
     push(@cmds, $cmd);
