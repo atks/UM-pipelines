@@ -93,6 +93,7 @@ printf("         cluster              %s\n", $cluster);
 printf("         sleep                %s\n", $sleep);
 printf("         sequence file        %s\n", $sequenceFile);
 printf("         reference            %s\n", $refGenomeFASTAFile);
+printf("         variant type         %s\n", $variantType);
 printf("         JVM Memory           %s\n", $jvmMemory);
 printf("\n");
 
@@ -125,17 +126,19 @@ print "added " . @SEQ . " sequences\n";
 my @tgts = ();
 my @deps = ();
 my @cmds = ();
-my $cmd;
+my $tgt;
+my $dep;
+my @cmd;
 
 ###############
 #log start time
 ###############
 my $logFile = "$auxVQSRDir/run.vqsr.log";
-push(@tgts,"$logFile.start.OK");
-push(@deps, "");
-$cmd = "\tdate | awk '{print \"gatk vqsr pipeline\\n\\nstart: \"\$\$0}' > $logFile\n";
-$cmd = $cmd . "\ttouch $logFile.start.OK\n";
-push(@cmds, $cmd);
+
+$tgt = "$logFile.start.OK";
+$dep = "";
+@cmd = ("date | awk '{print \"gatk vqsr pipeline\\n\\nstart: \"\$\$0}' > $logFile");
+makeStep($tgt, $dep, @cmd);
 
 #########################
 #Merge variant sites list
@@ -153,17 +156,15 @@ for my $chrom (@SEQ)
 #Concatenate sites list
 #######################
 my $allSitesVCFFile = "$auxVQSRDir/all.sites.vcf.gz";
-push(@tgts,"$allSitesVCFFile.OK");
-push(@deps, $mergedSitesVCFFile);
-$cmd = "\t$vt concat -L $mergedSitesVCFFile -o $allSitesVCFFile\n";
-$cmd .= "\ttouch $allSitesVCFFile.OK\n";
-push(@cmds, $cmd);
+$tgt = "$allSitesVCFFile.OK";
+$dep = $mergedSitesVCFFile;
+@cmd = ("$vt concat -L $mergedSitesVCFFile -o $allSitesVCFFile");
+makeStep($tgt, $dep, @cmd);
 
-push(@tgts,"$allSitesVCFFile.tbi.OK");
-push(@deps, "$allSitesVCFFile.OK");
-$cmd = "\t$vt index $allSitesVCFFile\n";
-$cmd .= "\ttouch $allSitesVCFFile.tbi.OK\n";
-push(@cmds, $cmd);
+$tgt = "$allSitesVCFFile.tbi.OK";
+$dep = "$allSitesVCFFile.OK";
+@cmd = ("$vt index $allSitesVCFFile");
+makeStep($tgt, $dep, @cmd);
 
 ###################
 ##VQSR SNP Training
@@ -242,25 +243,27 @@ my @sortedChromosomes = sort {if ($a=~/^\d+$/ && $b=~/^\d+$/){$a<=>$b} else { if
 ####################
 if ($variantType eq "BOTH" || $variantType eq "INDEL")
 {
-    push(@tgts,"$auxVQSRDir/recalibrate_INDEL.recal.OK");
-    push(@deps," $allSitesVCFFile.tbi.OK");
-    $cmd = "\t$gatk64g -T VariantRecalibrator " .
+    $tgt = "$auxVQSRDir/recalibrate_INDEL.recal.OK";
+    $dep = "$allSitesVCFFile.tbi.OK";
+    @cmd = ("\t$gatk64g -T VariantRecalibrator " .
                    "-R $refGenomeFASTAFile " .
                    "-input $allSitesVCFFile " .
-                   "-resource:hapmap,known=false,training=true,truth=true,prior=12.0 /net/fantasia/home/atks/ref/gatk/2.8_b37/Mills_and_1000G_gold_standard.indels.b37.vcf.gz " .
+                   "-resource:mills,known=false,training=true,truth=true,prior=12.0 /net/fantasia/home/atks/ref/gatk/2.8_b37/Mills_and_1000G_gold_standard.indels.b37.vcf.gz " .
+                   "-resource:dbsnp,known=true,training=false,truth=false,prior=2.0 /net/fantasia/home/atks/ref/gatk/2.8_b37/dbsnp_138.b37.vcf.gz " .
+                   "-an QD " .
                    "-an DP " .
                    "-an FS " .
-                   "-an MQRankSum " .
                    "-an ReadPosRankSum " .
+                   "-an MQRankSum " .
+                   "-an InbreedingCoeff " .
                    "-mode INDEL " .
                    "-tranche 100.0 -tranche 99.9 -tranche 99.0 -tranche 90.0 " .
                    "--maxGaussians 4 ".
                    "-recalFile $auxVQSRDir/recalibrate_INDEL.recal " .
                    "-tranchesFile $auxVQSRDir/recalibrate_INDEL.tranches " .
-                   "-rscriptFile $auxVQSRDir/recalibrate_INDEL_plots.R " .
-                   "\n";
-    $cmd .= "\ttouch $auxVQSRDir/recalibrate_INDEL.recal.OK\n";
-    push(@cmds, $cmd);
+                   "-rscriptFile $auxVQSRDir/recalibrate_INDEL_plots.R "
+              );
+    makeStep($tgt, $dep, @cmd);
 }
 
 #########################
@@ -274,71 +277,64 @@ if ($variantType eq "BOTH" || $variantType eq "INDEL")
         my $outputVQSRVCFFile = "$vqsrDir/$chrom.vqsr.genotypes.vcf.gz";
         my $dependencyVCFFile = ($variantType eq "BOTH") ? "$auxVQSRDir/$chrom.snps.vcf.gz" : "$inputDir/$chrom.vcf.gz";
         
-        push(@tgts,"$outputVQSRVCFFile.OK");
-        push(@deps,"$dependencyVCFFile.OK");
-        $cmd = "\t$gatk -T ApplyRecalibration " .
+        $tgt = "$outputVQSRVCFFile.OK";
+        $dep = "$auxVQSRDir/recalibrate_INDEL.recal.OK $dependencyVCFFile.OK";
+        @cmd = ("$gatk -T ApplyRecalibration " .
                        "-R $refGenomeFASTAFile " .
                        "-input $dependencyVCFFile " .
                        "-ts_filter_level 99.0 " .
                        "-mode INDEL " .
                        "-recalFile $auxVQSRDir/recalibrate_INDEL.recal " .
                        "-tranchesFile $auxVQSRDir/recalibrate_INDEL.tranches " .
-                       "-o $outputVQSRVCFFile";
-        $cmd = "\t" . makeMos($cmd) . "\n";
-        $cmd .= "\n\ttouch $outputVQSRVCFFile.OK\n";
-        push(@cmds, $cmd);
-    
+                       "-o $outputVQSRVCFFile"
+                );
+        makeStep($tgt, $dep, @cmd);
+        
         #index
-        push(@tgts,"$outputVQSRVCFFile.tbi.OK");
-        push(@deps,"$outputVQSRVCFFile.OK");
-        $cmd = "$vt index $outputVQSRVCFFile";
-        $cmd = "\t" . makeMos($cmd) . "\n";
-        $cmd .= "\n\ttouch $outputVQSRVCFFile.tbi.OK\n";
-        push(@cmds, $cmd);    
+        $tgt = "$outputVQSRVCFFile.tbi.OK";
+        $dep = "$outputVQSRVCFFile.OK";
+        @cmd = ("$vt index $outputVQSRVCFFile");
+        makeStep($tgt, $dep, @cmd);
         
         my $outputVQSRSitesVCFFile = $outputVQSRVCFFile;
         $outputVQSRSitesVCFFile =~ s/genotypes/sites/;
     
         #extract sites
-        push(@tgts,"$outputVQSRSitesVCFFile.OK");
-        push(@deps,"$outputVQSRVCFFile.OK");
-        $cmd = "$vt view -s $outputVQSRVCFFile -o $outputVQSRSitesVCFFile";
-        $cmd = "\t" . makeMos($cmd) . "\n";
-        $cmd .= "\n\ttouch $outputVQSRSitesVCFFile.OK\n";
-        push(@cmds, $cmd);
+        $tgt = "$outputVQSRSitesVCFFile.OK";
+        $dep = "$outputVQSRVCFFile.OK";
+        @cmd = ("$vt view -s $outputVQSRVCFFile -o $outputVQSRSitesVCFFile");
+        makeStep($tgt, $dep, @cmd);
         
         #index sites
-        push(@tgts,"$outputVQSRSitesVCFFile.tbi.OK");
-        push(@deps,"$outputVQSRSitesVCFFile.OK");
-        $cmd = "$vt index $outputVQSRSitesVCFFile";
-        $cmd = "\t" . makeMos($cmd) . "\n";
-        $cmd .= "\n\ttouch $outputVQSRSitesVCFFile.tbi.OK\n";
-        push(@cmds, $cmd);   
-        
+        $tgt = "$outputVQSRSitesVCFFile.tbi.OK";
+        $dep = "$outputVQSRSitesVCFFile.OK";
+        @cmd = ("$vt index $outputVQSRSitesVCFFile");
+        makeStep($tgt, $dep, @cmd);
     }
 }
 
 #############
-#log end time
+#Log end time
 #############
-push(@tgts,"$logFile.end.OK");
-push(@deps, "$vqsrSitesVCFFilesIndicesOK");
-$cmd = "\tdate | awk '{print \"end: \"\$\$0}' >> $logFile\n";
-$cmd = $cmd . "\ttouch $logFile.end.OK\n";
-push(@cmds, $cmd);
+$tgt = "$logFile.end.OK";
+$dep = "$vqsrSitesVCFFilesIndicesOK";
+@cmd = ("date | awk '{print \"end: \"\$\$0}' >> $logFile");
+makeStep($tgt, $dep, @cmd);
 
-#*******************
+######
+#Clean
+######
+$tgt = "clean";
+$dep = "";
+@cmd = ("-rm -rf $outputDir/*.OK");
+makeLocalStep($tgt, $dep, @cmd);
+
+####################
 #Write out make file
-#*******************
+####################
 open(MAK,">$makeFile") || die "Cannot open $makeFile\n";
 print MAK ".DELETE_ON_ERROR:\n\n";
 print MAK "all: @tgts\n\n";
-
-#clean
-push(@tgts,"clean");
-push(@deps, "");
-$cmd = "\t-rm -rf $outputDir/*.OK\n";
-push(@cmds, $cmd);
 
 for(my $i=0; $i < @tgts; ++$i) {
     print MAK "$tgts[$i]: $deps[$i]\n";
@@ -370,4 +366,34 @@ sub makeMos
         print STDERR "$cluster not supported\n";
         exit(1);
     }
+}
+
+sub makeLocalStep
+{
+    my ($tgt, $dep, @cmd) = @_;
+    
+    push(@tgts, $tgt);
+    push(@deps, $dep);
+    my $cmd = "";
+    for my $c (@cmd)
+    {
+        $cmd .= "\t" . $c . "\n";
+    }
+    $cmd .= "\ttouch $tgt\n";
+    push(@cmds, $cmd);
+}
+
+sub makeStep
+{
+    my ($tgt, $dep, @cmd) = @_;
+    
+    push(@tgts, $tgt);
+    push(@deps, $dep);
+    my $cmd = "";
+    for my $c (@cmd)
+    {
+        $cmd .= "\t" . makeMos($c) . "\n";
+    }
+    $cmd .= "\ttouch $tgt\n";
+    push(@cmds, $cmd);
 }
