@@ -274,12 +274,19 @@ if ($variantType eq "BOTH")
                        "-o $outputVCFFile");
         makeStep($tgt, $dep, @cmd);
 
+        #index
+        $inputVCFFile = "$auxVQSRDir/$chrom.snps.vcf.gz";
+        $tgt = "$inputVCFFile.tbi.OK";
+        $dep = "$inputVCFFile.OK";
+        @cmd = ("$vt index $inputVCFFile");
+        makeStep($tgt, $dep, @cmd);
+        
         #recalibrate Indels
         $outputVCFFile = "$vqsrDir/$chrom.vqsr.genotypes.vcf.gz";
         $inputVCFFile = "$auxVQSRDir/$chrom.snps.vcf.gz";
 
         $tgt = "$outputVCFFile.OK";
-        $dep = "$auxVQSRDir/recalibrate_INDEL.recal.OK $inputVCFFile.OK";
+        $dep = "$auxVQSRDir/recalibrate_INDEL.recal.OK $inputVCFFile.tbi.OK";
         @cmd = ("$gatk -T ApplyRecalibration " .
                        "-R $refGenomeFASTAFile " .
                        "-input $inputVCFFile " .
