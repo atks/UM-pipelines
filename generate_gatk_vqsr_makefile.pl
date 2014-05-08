@@ -138,7 +138,7 @@ my $logFile = "$auxVQSRDir/run.vqsr.log";
 $tgt = "$logFile.start.OK";
 $dep = "";
 @cmd = ("date | awk '{print \"gatk vqsr pipeline\\n\\nstart: \"\$\$0}' > $logFile");
-makeStep($tgt, $dep, @cmd);
+makeLocalStep($tgt, $dep, @cmd);
 
 #########################
 #Merge variant sites list
@@ -152,12 +152,13 @@ for my $chrom (@SEQ)
     $vqsrSitesVCFFilesIndicesOK .= " $vqsrDir/$chrom.vqsr.sites.vcf.gz.tbi.OK";
 }
 
+
 #######################
 #Concatenate sites list
 #######################
 my $allSitesVCFFile = "$auxVQSRDir/all.sites.vcf.gz";
 $tgt = "$allSitesVCFFile.OK";
-$dep = $mergedSitesVCFFile;
+$dep = "";
 @cmd = ("$vt concat -L $mergedSitesVCFFile -o $allSitesVCFFile");
 makeStep($tgt, $dep, @cmd);
 
@@ -169,83 +170,53 @@ makeStep($tgt, $dep, @cmd);
 ###################
 ##VQSR SNP Training
 ###################
-#if ($variantType eq "BOTH" || $variantType eq "SNP")
-#{
-#    push(@tgts,"$auxVQSRDir/recalibrate_SNP.recal.OK");
-#    push(@deps," $allSitesVCFFile.OK");
-#    $cmd = "\t$gatk64g -T VariantRecalibrator " .
-#                   "-R $refGenomeFASTAFile " .
-#                   "-input $allSitesVCFFile " .
-#                   "-resource:hapmap,known=false,training=true,truth=true,prior=15.0 /net/fantasia/home/atks/ref/gatk/2.8_b37/hapmap_3.3.b37.vcf.gz " .
-#                   "-resource:omni,known=false,training=true,truth=true,prior=12.0 /net/fantasia/home/atks/ref/gatk/2.8_b37/1000G_omni2.5.b37.vcf.gz " .
-#                   "-resource:1000G,known=false,training=true,truth=false,prior=10.0 /net/fantasia/home/atks/ref/gatk/2.8_b37/1000G_phase1.snps.high_confidence.b37.vcf.gz " .
-#                   "-resource:dbsnp,known=true,training=false,truth=false,prior=2.0 /net/fantasia/home/atks/ref/gatk/2.8_b37/dbsnp_138.b37.excluding_sites_after_129.vcf.gz " .
-#                   "-an DP " .
-#                   "-an QD " .
-#                   "-an FS " .
-#                   "-an MQRankSum " .
-#                   "-an ReadPosRankSum " .
-#                   "-mode SNP " .
-#                   "-tranche 100.0 -tranche 99.9 -tranche 99.0 -tranche 90.0 " .
-#                   "-recalFile $auxVQSRDir/recalibrate_SNP.recal " .
-#                   "-tranchesFile $auxVQSRDir/recalibrate_SNP.tranches " .
-#                   "-rscriptFile $auxVQSRDir/recalibrate_SNP_plots.R " .
-#                   "\n";
-#    $cmd = "\t" . $cmd . "\n";
-#    $cmd .= "\n\ttouch $auxVQSRDir/recalibrate_SNP.recal.OK\n";
-#    push(@cmds, $cmd);
-#}
+if ($variantType eq "BOTH" || $variantType eq "SNP")
+{
+    $tgt = "$logFile.start.snp.recalibration.OK";
+    $dep = "$allSitesVCFFile.tbi.OK";
+    @cmd = ("date | awk '{print \"start snp recalibration: \"\$\$0}' >> $logFile");
+    makeLocalStep($tgt, $dep, @cmd);
 
-########################
-##VQSR SNP Recalibration
-########################
-my @sortedChromosomes = sort {if ($a=~/^\d+$/ && $b=~/^\d+$/){$a<=>$b} else { if ($a eq "MT") {return 1} elsif($b eq "MT") {return -1}else{$a cmp $b} }} @SEQ;
+    $tgt = "$auxVQSRDir/recalibrate_SNP.recal.OK";
+    $dep = "$logFile.start.snp.recalibration.OK";
+    @cmd = ("$gatk64g -T VariantRecalibrator " .
+                   "-R $refGenomeFASTAFile " .
+                   "-input $allSitesVCFFile " .
+                   "-resource:hapmap,known=false,training=true,truth=true,prior=15.0 /net/fantasia/home/atks/ref/gatk/2.8_b37/hapmap_3.3.b37.vcf.gz " .
+                   "-resource:omni,known=false,training=true,truth=true,prior=12.0 /net/fantasia/home/atks/ref/gatk/2.8_b37/1000G_omni2.5.b37.vcf.gz " .
+                   "-resource:1000G,known=false,training=true,truth=false,prior=10.0 /net/fantasia/home/atks/ref/gatk/2.8_b37/1000G_phase1.snps.high_confidence.b37.vcf.gz " .
+                   "-resource:dbsnp,known=true,training=false,truth=false,prior=2.0 /net/fantasia/home/atks/ref/gatk/2.8_b37/dbsnp_138.b37.excluding_sites_after_129.vcf.gz " .
+                   "-an DP " .
+                   "-an QD " .
+                   "-an FS " .
+                   "-an MQRankSum " .
+                   "-an ReadPosRankSum " .
+                   "-mode SNP " .
+                   "-tranche 100.0 -tranche 99.9 -tranche 99.0 -tranche 90.0 " .
+                   "-recalFile $auxVQSRDir/recalibrate_SNP.recal " .
+                   "-tranchesFile $auxVQSRDir/recalibrate_SNP.tranches " .
+                   "-rscriptFile $auxVQSRDir/recalibrate_SNP_plots.R ");
+    makeLocalStep($tgt, $dep, @cmd);
 
-#if ($variantType eq "BOTH" || $variantType eq "SNP")
-#{
-#    for my $chrom (@sortedChromosomes)
-#    {
-#         #recalibrate
-#        my $outputVQSRVCFFile = ($variantType eq "BOTH") ? "$auxVQSRDir/$chrom.snps.vcf.gz" : "$vqsrDir/$chrom.vqsr.genotypes.vcf.gz";
-#        my $dependencyVCFFile = "$inputDir/$chrom.vcf.gz";
-#                
-#        push(@tgts,"$outputVQSRVCFFile.OK");
-#        push(@deps,"$vqsrDir/recalibrate_SNP.recal.OK $dependencyVCFFile.OK");
-#        $cmd = "\t$gatk -T ApplyRecalibration " .
-#                       "-R $refGenomeFASTAFile " .
-#                       "-input $dependencyVCFFile " .
-#                       "-mode SNP " .
-#                       "-ts_filter_level 99.0 " .
-#                       "-recalFile $vqsrDir/recalibrate_SNP.recal " .
-#                       "-tranchesFile $vqsrDir/recalibrate_SNP.tranches " .
-#                       "-o $outputVQSRVCFFile";
-#        $cmd = "\t" . makeMos($cmd) . "\n";
-#        $cmd .= "\n\ttouch $outputVQSRVCFFile.OK\n";
-#        push(@cmds, $cmd);
-#    
-#        if ($variantType eq "SNP")
-#        {
-#            my $outputVQSRSitesVCFFile = $outputVQSRVCFFile;
-#            $outputVQSRSitesVCFFile =~ s/genotypes/sites/;
-#        
-#            push(@tgts,"$outputVQSRSitesVCFFile.OK");
-#            push(@deps,"$outputVQSRVCFFile.OK");
-#            $cmd = "$vt view -s $outputVQSRVCFFile -o $outputVQSRSitesVCFFile";
-#            $cmd = "\t" . makeMos($cmd) . "\n";
-#            $cmd .= "\n\ttouch $outputVQSRSitesVCFFile.OK\n";
-#            push(@cmds, $cmd);
-#        }
-#    }
-#}
+    $tgt = "$logFile.end.snp.recalibration.OK";
+    $dep = "$auxVQSRDir/recalibrate_SNP.recal.OK";
+    @cmd = ("date | awk '{print \"end snp recalibration: \"\$\$0}' >> $logFile");
+    makeLocalStep($tgt, $dep, @cmd);
+}
 
 ####################
 #VQSR INDEL Training
 ####################
 if ($variantType eq "BOTH" || $variantType eq "INDEL")
 {
-    $tgt = "$auxVQSRDir/recalibrate_INDEL.recal.OK";
+    $tgt = "$logFile.start.indel.recalibration.OK";
     $dep = "$allSitesVCFFile.tbi.OK";
-    @cmd = ("\t$gatk64g -T VariantRecalibrator " .
+    @cmd = ("date | awk '{print \"start indel recalibration: \"\$\$0}' >> $logFile");
+    makeLocalStep($tgt, $dep, @cmd);
+
+    $tgt = "$auxVQSRDir/recalibrate_INDEL.recal.OK";
+    $dep = "$logFile.start.indel.recalibration.OK";
+    @cmd = ("$gatk64g -T VariantRecalibrator " .
                    "-R $refGenomeFASTAFile " .
                    "-input $allSitesVCFFile " .
                    "-resource:mills,known=false,training=true,truth=true,prior=12.0 /net/fantasia/home/atks/ref/gatk/2.8_b37/Mills_and_1000G_gold_standard.indels.b37.vcf.gz " .
@@ -264,62 +235,172 @@ if ($variantType eq "BOTH" || $variantType eq "INDEL")
                    "-rscriptFile $auxVQSRDir/recalibrate_INDEL_plots.R "
               );
     makeStep($tgt, $dep, @cmd);
+
+    $tgt = "$logFile.end.indel.recalibration.OK";
+    $dep = "$auxVQSRDir/recalibrate_INDEL.recal.OK";
+    @cmd = ("date | awk '{print \"end indel recalibration: \"\$\$0}' >> $logFile");
+    makeLocalStep($tgt, $dep, @cmd);
 }
 
-#########################
-#VQSR INDEL Recalibration
-#########################
-if ($variantType eq "BOTH" || $variantType eq "INDEL")
+####################
+##VQSR Recalibration
+####################
+my @sortedChromosomes = sort {if ($a=~/^\d+$/ && $b=~/^\d+$/){$a<=>$b} else { if ($a eq "MT") {return 1} elsif($b eq "MT") {return -1}else{$a cmp $b} }} @SEQ;
+
+if ($variantType eq "BOTH")
 {
+    $tgt = "$logFile.start.snp.indel.filtering.OK ";
+    $dep = "$logFile.end.snp.recalibration.OK $logFile.end.indel.recalibration.OK";
+    @cmd = ("date | awk '{print \"start filtering: \"\$\$0}' >> $logFile");
+    makeLocalStep($tgt, $dep, @cmd);
+
+    my $VQSRSiteVCFFileIndicesOK = "";
+
     for my $chrom (@sortedChromosomes)
     {
-        #recalibrate
-        my $outputVQSRVCFFile = "$vqsrDir/$chrom.vqsr.genotypes.vcf.gz";
-        my $dependencyVCFFile = ($variantType eq "BOTH") ? "$auxVQSRDir/$chrom.snps.vcf.gz" : "$inputDir/$chrom.vcf.gz";
-        
-        $tgt = "$outputVQSRVCFFile.OK";
-        $dep = "$auxVQSRDir/recalibrate_INDEL.recal.OK $dependencyVCFFile.OK";
+        #recalibrate SNPs
+        my $outputVCFFile = "$auxVQSRDir/$chrom.snps.vcf.gz";
+        my $inputVCFFile = "$inputDir/$chrom.genotypes.vcf.gz";
+
+        $tgt = "$outputVCFFile.OK";
+        $dep = "$auxVQSRDir/recalibrate_SNP.recal.OK $inputVCFFile";
         @cmd = ("$gatk -T ApplyRecalibration " .
                        "-R $refGenomeFASTAFile " .
-                       "-input $dependencyVCFFile " .
+                       "-input $inputVCFFile " .
+                       "-mode SNP " .
+                       "-ts_filter_level 99.0 " .
+                       "-recalFile $auxVQSRDir/recalibrate_SNP.recal " .
+                       "-tranchesFile $auxVQSRDir/recalibrate_SNP.tranches " .
+                       "-o $outputVCFFile");
+        makeStep($tgt, $dep, @cmd);
+
+        #recalibrate Indels
+        $outputVCFFile = "$vqsrDir/$chrom.vqsr.genotypes.vcf.gz";
+        $inputVCFFile = "$auxVQSRDir/$chrom.snps.vcf.gz";
+
+        $tgt = "$outputVCFFile.OK";
+        $dep = "$auxVQSRDir/recalibrate_INDEL.recal.OK $inputVCFFile.OK";
+        @cmd = ("$gatk -T ApplyRecalibration " .
+                       "-R $refGenomeFASTAFile " .
+                       "-input $inputVCFFile " .
                        "-ts_filter_level 99.0 " .
                        "-mode INDEL " .
                        "-recalFile $auxVQSRDir/recalibrate_INDEL.recal " .
                        "-tranchesFile $auxVQSRDir/recalibrate_INDEL.tranches " .
-                       "-o $outputVQSRVCFFile"
-                );
+                       "-o $outputVCFFile");
         makeStep($tgt, $dep, @cmd);
-        
+
         #index
-        $tgt = "$outputVQSRVCFFile.tbi.OK";
-        $dep = "$outputVQSRVCFFile.OK";
-        @cmd = ("$vt index $outputVQSRVCFFile");
+        my $VQSRVCFFile = "$vqsrDir/$chrom.vqsr.genotypes.vcf.gz";
+        $tgt = "$VQSRVCFFile.tbi.OK";
+        $dep = "$VQSRVCFFile.OK";
+        @cmd = ("$vt index $VQSRVCFFile");
         makeStep($tgt, $dep, @cmd);
-        
-        my $outputVQSRSitesVCFFile = $outputVQSRVCFFile;
-        $outputVQSRSitesVCFFile =~ s/genotypes/sites/;
-    
+
+        my $VQSRSitesVCFFile = "$vqsrDir/$chrom.vqsr.sites.vcf.gz";
+
         #extract sites
-        $tgt = "$outputVQSRSitesVCFFile.OK";
-        $dep = "$outputVQSRVCFFile.OK";
-        @cmd = ("$vt view -s $outputVQSRVCFFile -o $outputVQSRSitesVCFFile");
+        $tgt = "$VQSRSitesVCFFile.OK";
+        $dep = "$VQSRVCFFile.OK";
+        @cmd = ("$vt view -s $VQSRVCFFile -o $VQSRSitesVCFFile");
         makeStep($tgt, $dep, @cmd);
-        
+
         #index sites
-        $tgt = "$outputVQSRSitesVCFFile.tbi.OK";
-        $dep = "$outputVQSRSitesVCFFile.OK";
-        @cmd = ("$vt index $outputVQSRSitesVCFFile");
+        $tgt = "$VQSRSitesVCFFile.tbi.OK";
+        $dep = "$VQSRSitesVCFFile.OK";
+        @cmd = ("$vt index $VQSRSitesVCFFile");
         makeStep($tgt, $dep, @cmd);
+
+        $VQSRSiteVCFFileIndicesOK .= " $VQSRSitesVCFFile.tbi.OK";
     }
+
+    $tgt = "$logFile.end.snp.indel.filtering.OK ";
+    $dep = "$VQSRSiteVCFFileIndicesOK";
+    @cmd = ("date | awk '{print \"end filtering: \"\$\$0}' >> $logFile");
+    makeLocalStep($tgt, $dep, @cmd);
+}
+else
+{
+    my $variant = $variantType eq "SNP" ? "snp" : "indel";
+    $tgt = "$logFile.start.filtering.OK";
+    $dep = "$logFile.end.$variant.recalibration.OK";
+    @cmd = ("date | awk '{print \"start filtering: \"\$\$0}' >> $logFile");
+    makeLocalStep($tgt, $dep, @cmd);
+
+    my $VQSRSiteVCFFileIndicesOK = "";
+
+    for my $chrom (@sortedChromosomes)
+    {
+        my $outputVCFFile = "$vqsrDir/$chrom.vqsr.genotypes.vcf.gz";
+        my $inputVCFFile = "$inputDir/$chrom.genotypes.vcf.gz";
+
+        if ($variantType eq "SNP")
+        {
+
+            $tgt = "$outputVCFFile.OK";
+            $dep = "$vqsrDir/recalibrate_SNP.recal.OK $inputVCFFile.OK";
+            @cmd = ("$gatk -T ApplyRecalibration " .
+                           "-R $refGenomeFASTAFile " .
+                           "-input $inputVCFFile " .
+                           "-mode SNP " .
+                           "-ts_filter_level 99.0 " .
+                           "-recalFile $vqsrDir/recalibrate_SNP.recal " .
+                           "-tranchesFile $vqsrDir/recalibrate_SNP.tranches " .
+                           "-o $outputVCFFile");
+            makeStep($tgt, $dep, @cmd);
+        }
+        else
+        {
+            $tgt = "$outputVCFFile.OK";
+            $dep = "$auxVQSRDir/recalibrate_INDEL.recal.OK $inputVCFFile.OK";
+            @cmd = ("$gatk -T ApplyRecalibration " .
+                           "-R $refGenomeFASTAFile " .
+                           "-input $inputVCFFile " .
+                           "-ts_filter_level 99.0 " .
+                           "-mode INDEL " .
+                           "-recalFile $auxVQSRDir/recalibrate_INDEL.recal " .
+                           "-tranchesFile $auxVQSRDir/recalibrate_INDEL.tranches " .
+                           "-o $outputVCFFile"
+                    );
+            makeStep($tgt, $dep, @cmd);
+        }
+
+        my $VQSRVCFFile = "$vqsrDir/$chrom.vqsr.genotypes.vcf.gz";
+        my $VQSRSitesVCFFile = " $vqsrDir/$chrom.vqsr.sites.vcf.gz";
+
+        #index
+        $tgt = "$VQSRVCFFile.tbi.OK";
+        $dep = "$VQSRVCFFile.OK";
+        @cmd = ("$vt index $VQSRVCFFile");
+        makeStep($tgt, $dep, @cmd);
+
+        #extract sites
+        $tgt = "$VQSRSitesVCFFile.OK";
+        $dep = "$VQSRVCFFile.OK";
+        @cmd = ("$vt view -s $outputVCFFile -o $VQSRSitesVCFFile");
+        makeStep($tgt, $dep, @cmd);
+
+        #index sites
+        $tgt = "$VQSRSitesVCFFile.tbi.OK";
+        $dep = "$VQSRSitesVCFFile.OK";
+        @cmd = ("$vt index $VQSRSitesVCFFile");
+        makeStep($tgt, $dep, @cmd);
+
+        $VQSRSiteVCFFileIndicesOK .= " $VQSRSitesVCFFile.tbi.OK";
+    }
+
+    $tgt = "$logFile.end.OK";
+    $dep = "$vqsrSitesVCFFilesIndicesOK";
+    @cmd = ("date | awk '{print \"end recalibration: \"\$\$0}' >> $logFile");
+    makeLocalStep($tgt, $dep, @cmd);
 }
 
-#############
-#Log end time
-#############
-$tgt = "$logFile.end.OK";
-$dep = "$vqsrSitesVCFFilesIndicesOK";
-@cmd = ("date | awk '{print \"end: \"\$\$0}' >> $logFile");
-makeStep($tgt, $dep, @cmd);
+####################
+#Write out make file
+####################
+open(MAK,">$makeFile") || die "Cannot open $makeFile\n";
+print MAK ".DELETE_ON_ERROR:\n\n";
+print MAK "all: @tgts\n\n";
 
 ######
 #Clean
@@ -328,13 +409,6 @@ $tgt = "clean";
 $dep = "";
 @cmd = ("-rm -rf $outputDir/*.OK");
 makeLocalStep($tgt, $dep, @cmd);
-
-####################
-#Write out make file
-####################
-open(MAK,">$makeFile") || die "Cannot open $makeFile\n";
-print MAK ".DELETE_ON_ERROR:\n\n";
-print MAK "all: @tgts\n\n";
 
 for(my $i=0; $i < @tgts; ++$i) {
     print MAK "$tgts[$i]: $deps[$i]\n";
@@ -368,31 +442,31 @@ sub makeMos
     }
 }
 
-sub makeLocalStep
-{
-    my ($tgt, $dep, @cmd) = @_;
-    
-    push(@tgts, $tgt);
-    push(@deps, $dep);
-    my $cmd = "";
-    for my $c (@cmd)
-    {
-        $cmd .= "\t" . $c . "\n";
-    }
-    $cmd .= "\ttouch $tgt\n";
-    push(@cmds, $cmd);
-}
-
 sub makeStep
 {
     my ($tgt, $dep, @cmd) = @_;
-    
+
     push(@tgts, $tgt);
     push(@deps, $dep);
     my $cmd = "";
     for my $c (@cmd)
     {
         $cmd .= "\t" . makeMos($c) . "\n";
+    }
+    $cmd .= "\ttouch $tgt\n";
+    push(@cmds, $cmd);
+}
+
+sub makeLocalStep
+{
+    my ($tgt, $dep, @cmd) = @_;
+
+    push(@tgts, $tgt);
+    push(@deps, $dep);
+    my $cmd = "";
+    for my $c (@cmd)
+    {
+        $cmd .= "\t" . $c . "\n";
     }
     $cmd .= "\ttouch $tgt\n";
     push(@cmds, $cmd);
