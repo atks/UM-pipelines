@@ -334,7 +334,7 @@ if ($intervalWidth!=0)
         my $inputVCFFile = "$vcfOutDir/$interval.vcf";
         my $outputVCFFile = "$vcfOutDir/$interval.genotypes.vcf";
         $tgt = "$outputVCFFile.OK";
-        $dep = "";
+        $dep = "$inputVCFFile.OK";
         @cmd = ("$gatk -T GenotypeGVCFs -R $refGenomeFASTAFile --variant $inputVCFFile -o $outputVCFFile");
         makeStep($tgt, $dep, @cmd);
         
@@ -346,7 +346,7 @@ else
     my $inputVCFFile = "$vcfOutDir/all.vcf";
     my $outputVCFFile = "$finalVCFOutDir/all.genotypes.vcf";
     $tgt = "$outputVCFFile.OK";
-    $dep = "";
+    $dep = "$inputVCFFile.OK";
     @cmd = ("$gatk -T CombineGVCFs -R $refGenomeFASTAFile --variant $inputVCFFile -o $outputVCFFile");
     makeStep($tgt, $dep, @cmd);
     
@@ -410,7 +410,7 @@ if ($intervalWidth!=0)
         
     }
 
-    $tgt = "$logFile.end.start.concat.normalize.OK";
+    $tgt = "$logFile.end.concat.normalize.OK";
     $dep = "$chromGenotypeVCFFilesOK";
     @cmd = ("date | awk '{print \"end concat and normalize: \"\$\$0}' >> $logFile");
     makeLocalStep($tgt, $dep, @cmd);
