@@ -47,7 +47,6 @@ my $intervalWidth = 1000000;
 my $refGenomeFASTAFile = "";
 my $jvmMemory = "2g";
 my $variantType = "BOTH";
-my $caller = "UnifiedGenotyper";
 
 #initialize options
 Getopt::Long::Configure ('bundling');
@@ -64,7 +63,6 @@ if(!GetOptions ('h'=>\$help,
                 'l:s'=>\$sequenceLengthFile,
                 'i:s'=>\$intervalWidth,
                 'r:s'=>\$refGenomeFASTAFile,
-                'x:s'=>\$caller,
                 'j:s'=>\$jvmMemory,
                 'v:s'=>\$variantType
                 )
@@ -103,7 +101,6 @@ printf("         sample file          %s\n", $sampleFile);
 printf("         sequence length file %s\n", $sequenceLengthFile);
 printf("         interval width       %s\n", $intervalWidth);
 printf("         reference            %s\n", $refGenomeFASTAFile);
-printf("         caller               %s\n", $caller);
 printf("         JVM Memory           %s\n", $jvmMemory);
 printf("         variant types        %s\n", $variantType);
 printf("\n");
@@ -216,41 +213,32 @@ if ($writeIntervals)
 my @tgts = ();
 my @deps = ();
 my @cmds = ();
-my $cmd;
+my $tgt;
+my $dep;
+my @cmd;
+
 
 ###############
 #log start time
 ###############
 my $logFile = "$outDir/run.log";
-push(@tgts,"$logFile.start.OK");
-push(@deps, "");
-$cmd = "\tdate | awk '{print \"gatk unified genotyper calling pipeline\\n\\nstart: \"\$\$0}' > $logFile\n";
-$cmd = $cmd . "\ttouch $logFile.start.OK\n";
-push(@cmds, $cmd);
+$tgt = "$logFile.start.OK";
+$dep = "";
+@cmd = ("date | awk '{print \"gatk unified genotyper calling pipeline\\n\\nstart: \"\$\$0}' > $logFile");
+makeLocalStep($tgt, $dep, @cmd);
 
 #########################
 #Discovery and Genotyping
 #########################
 for my $i (0 .. $#intervals)
 {   
-    push(@tgts,"$vcfOutDir/$intervals[$i].vcf.OK");
-    push(@deps,"");
     #nct - number of computing threads
     #interval_padding ensures that you capture Indels that lie across a boundary. Note that UnifiedGenotyper uses locuswalker.
     #--max_alternate_alleles is set at 6 by default
-    
-    if ($caller eq "UnifiedGenotyper")
-    {
-        $cmd = "\t$gatk -T UnifiedGenotyper -R $refGenomeFASTAFile -glm $variantType --interval_padding 100 -I $bamListFile --genotyping_mode DISCOVERY -o $vcfOutDir/$intervals[$i].vcf --output_mode EMIT_VARIANTS_ONLY -L $intervalFiles[$i]";
-    }
-    else
-    {
-        $cmd = "\t$gatk -T HaplotypeCaller -R $refGenomeFASTAFile --interval_padding 100 -I $bamListFile --genotyping_mode DISCOVERY -o $vcfOutDir/$intervals[$i].vcf -L $intervalFiles[$i]";
-    }
-    
-    $cmd = "\t" . makeMos($cmd) . "\n";
-    $cmd .= "\n\ttouch $vcfOutDir/$intervals[$i].vcf.OK\n";
-    push(@cmds, $cmd);
+    $tgt = "$vcfOutDir/$intervals[$i].vcf.OK";
+    $dep = "";
+    @cmd = ("$gatk -T UnifiedGenotyper -minIndelCnt 2 -R $refGenomeFASTAFile -glm $variantType --interval_padding 100 -I $bamListFile --genotyping_mode DISCOVERY -o $vcfOutDir/$intervals[$i].vcf --output_mode EMIT_VARIANTS_ONLY -L $intervalFiles[$i]"),
+    makeStep($tgt, $dep, @cmd);
 }
 
 ###########################################
@@ -262,12 +250,10 @@ for my $chrom (@sortedChromosomes)
 {
     my $intervalFilesOK = join(' ', @{$intervalsByChromOK{$chrom}});
     
-    push(@tgts,"$finalVCFOutDir/$chrom.vcf.gz.OK");
-    push(@deps,"$intervalFilesOK");
-    $cmd = "$vt concat " . join(' ', @{$intervalsByChrom{$chrom}})  . " -o + | $vt normalize + -o + -r $refGenomeFASTAFile | $vt mergedups + -o $finalVCFOutDir/$chrom.vcf.gz";
-    $cmd = "\t" . makeMos($cmd) . "\n";
-    $cmd .= "\n\ttouch $finalVCFOutDir/$chrom.vcf.gz.OK\n";
-    push(@cmds, $cmd);
+    $tgt = "$finalVCFOutDir/$chrom.vcf.gz.OK";
+    $dep = "$intervalFilesOK";
+    @cmd = ("$vt concat " . join(' ', @{$intervalsByChrom{$chrom}})  . " -o + | $vt normalize + -o + -r $refGenomeFASTAFile | $vt mergedups + -o $finalVCFOutDir/$chrom.vcf.gz");
+    makeStep($tgt, $dep, @cmd);
     
     print IN "$finalVCFOutDir/$chrom.vcf.gz\n";    
 }
@@ -278,30 +264,24 @@ my $chromSitesVCFIndicesOK = "";
 for my $chrom (@sortedChromosomes)
 {
     #index main file
-    push(@tgts,"$finalVCFOutDir/$chrom.vcf.gz.tbi.OK");
-    push(@deps,"$finalVCFOutDir/$chrom.vcf.gz.OK");
-    $cmd = "$vt index $finalVCFOutDir/$chrom.vcf.gz";
-    $cmd = "\t" . makeMos($cmd) . "\n";
-    $cmd .= "\n\ttouch $finalVCFOutDir/$chrom.vcf.gz.tbi.OK\n";
-    push(@cmds, $cmd);
+    $tgt = "$finalVCFOutDir/$chrom.vcf.gz.tbi.OK";
+    $dep = "$finalVCFOutDir/$chrom.vcf.gz.OK";
+    @cmd = ("$vt index $finalVCFOutDir/$chrom.vcf.gz");
+    makeStep($tgt, $dep, @cmd);
     
     $chromVCFIndicesOK .= " $finalVCFOutDir/$chrom.vcf.gz.tbi.OK"; 
 
     #sites    
-    push(@tgts,"$finalVCFOutDir/$chrom.sites.vcf.gz.OK");
-    push(@deps,"$finalVCFOutDir/$chrom.vcf.gz.tbi.OK");
-    $cmd = "$vt view -s $finalVCFOutDir/$chrom.vcf.gz -o $finalVCFOutDir/$chrom.sites.vcf.gz";
-    $cmd = "\t" . makeMos($cmd) . "\n";
-    $cmd .= "\n\ttouch $finalVCFOutDir/$chrom.sites.vcf.gz.OK\n";
-    push(@cmds, $cmd);
+    $tgt = "$finalVCFOutDir/$chrom.sites.vcf.gz.OK";
+    $dep = "$finalVCFOutDir/$chrom.vcf.gz.tbi.OK";
+    @cmd = ("$vt view -s $finalVCFOutDir/$chrom.vcf.gz -o $finalVCFOutDir/$chrom.sites.vcf.gz");
+    makeStep($tgt, $dep, @cmd);
     
     #index sites
-    push(@tgts,"$finalVCFOutDir/$chrom.sites.vcf.gz.tbi.OK");
-    push(@deps,"$finalVCFOutDir/$chrom.sites.vcf.gz.OK");
-    $cmd = "$vt index $finalVCFOutDir/$chrom.sites.vcf.gz";
-    $cmd = "\t" . makeMos($cmd) . "\n";
-    $cmd .= "\n\ttouch $finalVCFOutDir/$chrom.sites.vcf.gz.tbi.OK\n";
-    push(@cmds, $cmd);
+    $tgt = "$finalVCFOutDir/$chrom.sites.vcf.gz.tbi.OK";
+    $dep = "$finalVCFOutDir/$chrom.sites.vcf.gz.OK";
+    @cmd = ("$vt index $finalVCFOutDir/$chrom.sites.vcf.gz");
+    makeStep($tgt, $dep, @cmd);
        
     $chromSitesVCFIndicesOK .= " $finalVCFOutDir/$chrom.sites.vcf.gz.tbi.OK";    
 }
@@ -309,11 +289,10 @@ for my $chrom (@sortedChromosomes)
 #############
 #log end time
 #############
-push(@tgts,"$logFile.end.OK");
-push(@deps, "$chromVCFIndicesOK");
-$cmd = "\tdate | awk '{print \"end: \"\$\$0}' >> $logFile\n";
-$cmd = $cmd . "\ttouch $logFile.end.OK\n";
-push(@cmds, $cmd);
+$tgt = "$logFile.end.OK";
+$dep = "$chromVCFIndicesOK";
+@cmd = ("date | awk '{print \"end: \"\$\$0}' >> $logFile");
+makeLocalStep($tgt, $dep, @cmd);
 	
 #*******************
 #Write out make file
@@ -323,10 +302,10 @@ print MAK ".DELETE_ON_ERROR:\n\n";
 print MAK "all: @tgts\n\n";
 
 #clean
-push(@tgts,"clean");
-push(@deps, "");
-$cmd = "\t-rm -rf $outDir/*.OK $vcfOutDir/*.OK $finalVCFOutDir/*.OK\n";
-push(@cmds, $cmd);
+$tgt = "clean";
+$dep = "";
+@cmd = ("-rm -rf $outDir/*.OK $vcfOutDir/*.OK $finalVCFOutDir/*.OK");
+makeStep($tgt, $dep, @cmd);
 
 for(my $i=0; $i < @tgts; ++$i) {
     print MAK "$tgts[$i]: $deps[$i]\n";
@@ -358,4 +337,34 @@ sub makeMos
         print STDERR "$cluster not supported\n";
         exit(1);
     }
+}
+
+sub makeStep
+{
+    my ($tgt, $dep, @cmd) = @_;
+
+    push(@tgts, $tgt);
+    push(@deps, $dep);
+    my $cmd = "";
+    for my $c (@cmd)
+    {
+        $cmd .= "\t" . makeMos($c) . "\n";
+    }
+    $cmd .= "\ttouch $tgt\n";
+    push(@cmds, $cmd);
+}
+
+sub makeLocalStep
+{
+    my ($tgt, $dep, @cmd) = @_;
+
+    push(@tgts, $tgt);
+    push(@deps, $dep);
+    my $cmd = "";
+    for my $c (@cmd)
+    {
+        $cmd .= "\t" . $c . "\n";
+    }
+    $cmd .= "\ttouch $tgt\n";
+    push(@cmds, $cmd);
 }
