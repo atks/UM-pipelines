@@ -237,7 +237,7 @@ for my $i (0 .. $#intervals)
     #--max_alternate_alleles is set at 6 by default
     $tgt = "$vcfOutDir/$intervals[$i].vcf.OK";
     $dep = "";
-    @cmd = ("$gatk -T UnifiedGenotyper -minIndelCnt 2 -R $refGenomeFASTAFile -glm $variantType --interval_padding 100 -I $bamListFile --genotyping_mode DISCOVERY -o $vcfOutDir/$intervals[$i].vcf --output_mode EMIT_VARIANTS_ONLY -L $intervalFiles[$i]"),
+    @cmd = ("$gatk -T UnifiedGenotyper -R $refGenomeFASTAFile -glm $variantType --interval_padding 100 -I $bamListFile --genotyping_mode DISCOVERY -o $vcfOutDir/$intervals[$i].vcf --output_mode EMIT_VARIANTS_ONLY -L $intervalFiles[$i]"),
     makeStep($tgt, $dep, @cmd);
 }
 
