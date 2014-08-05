@@ -152,7 +152,6 @@ for my $chrom (@SEQ)
     $vqsrSitesVCFFilesIndicesOK .= " $vqsrDir/$chrom.vqsr.sites.vcf.gz.tbi.OK";
 }
 
-
 #######################
 #Concatenate sites list
 #######################
@@ -280,7 +279,7 @@ if ($variantType eq "BOTH")
         $dep = "$inputVCFFile.OK";
         @cmd = ("$vt index $inputVCFFile");
         makeStep($tgt, $dep, @cmd);
-        
+
         #recalibrate Indels
         $outputVCFFile = "$vqsrDir/$chrom.vqsr.genotypes.vcf.gz";
         $inputVCFFile = "$auxVQSRDir/$chrom.snps.vcf.gz";

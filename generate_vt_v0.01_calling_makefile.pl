@@ -44,7 +44,8 @@ my $sleep = 0;
 my $sampleFile = "";
 my $intervals = "";
 my $variantTypes = "indels";
-my $refGenomeFASTAFile = "";
+my $refGenomeFASTAFile;
+my $dbsnpVCFFile;
 
 #programs
 
@@ -64,12 +65,14 @@ if(!GetOptions ('h'=>\$help,
                 's:s'=>\$sampleFile,
                 'v:s'=>\$variantTypes,
                 'i:s'=>\$intervals,
-                'r:s'=>\$refGenomeFASTAFile
+                'r:s'=>\$refGenomeFASTAFile,
+                'u:s'=>\$dbsnpVCFFile
                 )
   || !defined($outputDir)
   || !defined($makeFile)
   || !defined($sampleFile)
   || !defined($refGenomeFASTAFile)
+  || !defined($dbsnpVCFFile)
   || scalar(@ARGV)!=0)
 {
     if ($help)
@@ -99,6 +102,7 @@ printf("         sleep           %s\n", $sleep);
 printf("         sample file     %s\n", $sampleFile);
 printf("         variant types   %s\n", $variantTypes);
 printf("         intervals       %s\n", $intervalsOption eq "" ? "none" : $intervalsOption);
+printf("         dbsnp           %s\n", $dbsnpVCFFile);
 printf("         reference       %s\n", $refGenomeFASTAFile);
 printf("\n");
 
@@ -194,14 +198,14 @@ $dep = "$candidateVCFFile.OK";
 @cmd = ("$vt index $candidateVCFFile 2> $candidateVCFFile.$indexExt.log");
 makeStep($tgt, $dep, @cmd);
 
-###############
-##2. Genotyping
-###############
+##############
+#2. Genotyping
+##############
 
 #construct probes for candidate sites
 my $probesVCFFile = "$auxDir/probes.sites.$ext";
 $tgt = "$probesVCFFile.OK";
-$dep = "$candidateVCFFile.OK";
+$dep = "$candidateVCFFile.$indexExt.OK";
 @cmd = ("$vt construct_probes $candidateVCFFile -r $refGenomeFASTAFile -o $probesVCFFile 2> $auxDir/probes.log");
 makeStep($tgt, $dep, @cmd);
 
@@ -255,13 +259,26 @@ close(IN);
 my $mergedVCFFile = "$finalDir/all.genotypes.$ext";
 $tgt = "$mergedVCFFile.OK";
 $dep = "$sampleGenotypesVCFIndexOKFiles";
-@cmd = ("$vt paste -L $mergedVCFFileList -o + | $vt compute_features + -o + 2> $finalDir/compute_features.log | $vt remove_overlap + -o $mergedVCFFile 2> $finalDir/remove_overlap.log");
+@cmd = ("$vt paste -L $mergedVCFFileList -o + | $vt compute_features + -o + 2> $finalDir/compute_features.log | $vt annotate_dbsnp_rsid - -d $dbsnpVCFFile  2>$finalDir/annotate_dbsnp_rsid.log | $vt remove_overlap - -o $mergedVCFFile 2> $finalDir/remove_overlap.log");
 makeStep($tgt, $dep, @cmd);
 
 #index
 $tgt = "$mergedVCFFile.$indexExt.OK";
 $dep = "$mergedVCFFile.OK";
 @cmd = ("$vt index $mergedVCFFile");
+makeStep($tgt, $dep, @cmd);
+
+#generate site file
+my $mergedVCFSitesFile = "$finalDir/all.sites.$ext";
+$tgt = "$mergedVCFSitesFile.OK";
+$dep = "$mergedVCFFile.OK";
+@cmd = ("$vt view -s $mergedVCFFile -o $mergedVCFSitesFile");
+makeStep($tgt, $dep, @cmd);
+
+#index
+$tgt = "$mergedVCFSitesFile.$indexExt.OK";
+$dep = "$mergedVCFSitesFile.OK";
+@cmd = ("$vt index $mergedVCFSitesFile");
 makeStep($tgt, $dep, @cmd);
 
 #############
