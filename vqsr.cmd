@@ -1,0 +1,12 @@
+/net/fantasia/home/atks/dev/vt/pipeline/generate_gatk_vqsr_pipeline_makefile.pl \
+-i /net/assembly/atks/neptune/20140805_gatk_vqsr/run_gatk_ug_indels/final \
+-o /net/assembly/atks/neptune/20140805_gatk_vqsr/run_gatk_ug_indels \
+-b /net/assembly/atks/neptune/20140805_gatk_vqsr/codes/vt \
+-t /net/assembly/atks/neptune/20140805_gatk_vqsr/codes/cluster \
+-m neptune.low_coverage.gatk.ug.vqsr.indels.mk \
+-c mini \
+-d 0 \
+-l seq.length.txt \
+-r /net/assembly/atks/ref/hs37d5.fa \
+-j 16g \
+-v INDEL
