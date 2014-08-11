@@ -37,7 +37,7 @@ my $clusterDir = "/net/fantasia/home/atks/programs/cluster";
 my $help;
 my $genotypeVCFFileList;
 my $pedigreeFile;
-my $refGenomeFASTAFile = "/net/fantasia/home/atks/ref/genome/hs37d5.fa";
+my $refGenomeFASTAFile;
 my $gencodeAnnotationGTFFile = "/net/fantasia/home/atks/dev/vt/bundle/public/grch37/gencode.v19.annotation.gtf.gz";
 my $gencodeCodingRegionsBEDFile = "/net/fantasia/home/atks/dev/vt/bundle/public/grch37/gencode.cds.bed.gz";
 my $mdustRegionsBEDFile = "/net/fantasia/home/atks/dev/vt/bundle/public/grch37/mdust.bed.gz";
@@ -232,7 +232,7 @@ $pdfFiles .= " $plotFile";
 $pdfFilesOK .= " $plotFile.OK";
 $tgt = "$plotFile.OK";
 $dep = "$auxDir/all.annotated.sites.bcf.OK";
-@cmd = ("$vt peek $auxDir/all.annotated.sites.bcf -x $plotDir/tabulate_summary -y $plotFile -f \"PASS\"  2> $logDir/summary.pass.log");
+@cmd = ("$vt peek $auxDir/all.annotated.sites.bcf -x $plotDir/tabulate_pass_summary -y $plotFile -f \"PASS\"  2> $logDir/summary.pass.log");
 makeLocalStep($tgt, $dep, @cmd);
 
 $plotFile = "$plotDir/summary.fail.pdf";
@@ -240,7 +240,7 @@ $pdfFiles .= " $plotFile";
 $pdfFilesOK .= " $plotFile.OK";
 $tgt = "$plotFile.OK";
 $dep = "$auxDir/all.annotated.sites.bcf.OK";
-@cmd = ("$vt peek $auxDir/all.annotated.sites.bcf -x $plotDir/tabulate_summary -y $plotFile -f \"~PASS\"  2> $logDir/summary.fail.log");
+@cmd = ("$vt peek $auxDir/all.annotated.sites.bcf -x $plotDir/tabulate_fail_summary -y $plotFile -f \"~PASS\"  2> $logDir/summary.fail.log");
 makeLocalStep($tgt, $dep, @cmd);
 
 ##Chromosome
@@ -258,7 +258,7 @@ $pdfFiles .= " $plotFile";
 $pdfFilesOK .= " $plotFile.OK";
 $tgt = "$plotFile.OK";
 $dep = "$auxDir/all.annotated.sites.bcf.OK";
-@cmd = ("$vt profile_afs $auxDir/all.annotated.sites.bcf -c VT_AC -n VT_AN -x $plotDir/plot_afs -y $plotFile  2> $logDir/profile_afs.log");
+@cmd = ("$vt profile_afs $auxDir/all.annotated.sites.bcf -c AC -n AN -x $plotDir/plot_afs -y $plotFile  2> $logDir/profile_afs.log");
 makeLocalStep($tgt, $dep, @cmd);
 
 ##HWE
@@ -267,25 +267,38 @@ $pdfFiles .= " $plotFile";
 $pdfFilesOK .= " $plotFile.OK";
 $tgt = "$plotFile.OK";
 $dep = "$auxDir/all.annotated.sites.bcf.OK";
-@cmd = ("$vt profile_hwe $auxDir/all.annotated.sites.bcf -h VT_HWE_LPVAL -a VT_MLEAF -x $plotDir/plot_hwe -y $plotFile  2> $logDir/profile_hwe.log");
+@cmd = ("$vt profile_hwe $auxDir/all.annotated.sites.bcf -h HWE_LPVAL -a MLEAF -x $plotDir/plot_hwe -y $plotFile  2> $logDir/profile_hwe.log");
 makeLocalStep($tgt, $dep, @cmd);
 
-#Mendelian
-my $tabulateFile = "$plotDir/mendelian.pdf";
-$pdfFiles .= " $tabulateFile";
-$pdfFilesOK .= " $tabulateFile.OK";
-$tgt = "$tabulateFile.OK";
-$dep = "$auxDir/20.annotated.genotypes.bcf.OK $auxDir/20.annotated.genotypes.bcf.csi.OK ";
-@cmd = ("$vt profile_mendelian $auxDir/20.genotypes.bcf -f \"PASS\" -p $pedigreeFile -x $plotDir/tabulate_mendelian -y $tabulateFile  2> $logDir/profile_mendelian.log");
-makeLocalStep($tgt, $dep, @cmd);
+my $tabulateFile;
+if (defined($pedigreeFile))
+{
+    #Mendelian
+    $tabulateFile = "$plotDir/mendelian.pdf";
+    $pdfFiles .= " $tabulateFile";
+    $pdfFilesOK .= " $tabulateFile.OK";
+    $tgt = "$tabulateFile.OK";
+    $dep = "$auxDir/20.annotated.genotypes.bcf.OK $auxDir/20.annotated.genotypes.bcf.csi.OK ";
+    @cmd = ("$vt profile_mendelian $auxDir/20.genotypes.bcf -f \"PASS\" -p $pedigreeFile -x $plotDir/tabulate_mendelian -y $tabulateFile  2> $logDir/profile_mendelian.log");
+    makeLocalStep($tgt, $dep, @cmd);
+}
 	
-#Overlap
-$tabulateFile = "$plotDir/overlap.indels.pdf";
+#Passed Indels Overlap
+$tabulateFile = "$plotDir/overlap.pass.indels.pdf";
 $pdfFiles .= " $tabulateFile";
 $pdfFilesOK .= " $tabulateFile.OK";
 $tgt = "$tabulateFile.OK";
 $dep = "$auxDir/all.annotated.sites.bcf.OK $auxDir/all.annotated.sites.bcf.csi.OK ";
-@cmd = ("$vt profile_indels $auxDir/all.annotated.sites.bcf -f \"PASS&&N_ALLELE==2&&VTYPE==INDEL\" -r $refGenomeFASTAFile -g $indelReferenceFile -x $plotDir/tabulate_indels -y $tabulateFile  2> $logDir/profile_indels.log");
+@cmd = ("$vt profile_indels $auxDir/all.annotated.sites.bcf -f \"PASS&&N_ALLELE==2&&VTYPE==INDEL\" -r $refGenomeFASTAFile -g $indelReferenceFile -x $plotDir/tabulate_passed_indels -y $tabulateFile  2> $logDir/profile_indels.log");
+makeLocalStep($tgt, $dep, @cmd);	
+
+#Failed Indels Overlap
+$tabulateFile = "$plotDir/overlap.fail.indels.pdf";
+$pdfFiles .= " $tabulateFile";
+$pdfFilesOK .= " $tabulateFile.OK";
+$tgt = "$tabulateFile.OK";
+$dep = "$auxDir/all.annotated.sites.bcf.OK $auxDir/all.annotated.sites.bcf.csi.OK ";
+@cmd = ("$vt profile_indels $auxDir/all.annotated.sites.bcf -f \"~PASS&&N_ALLELE==2&&VTYPE==INDEL\" -r $refGenomeFASTAFile -g $indelReferenceFile -x $plotDir/tabulate_failed_indels -y $tabulateFile  2> $logDir/profile_fail_indels.log");
 makeLocalStep($tgt, $dep, @cmd);	
 
 ###Overlap
@@ -301,7 +314,7 @@ $pdfFiles .= " $plotFile";
 $pdfFilesOK .= " $plotFile.OK";
 $tgt = "$plotFile.OK";
 $dep = "$auxDir/all.annotated.sites.bcf.OK $auxDir/all.annotated.sites.bcf.csi.OK ";
-@cmd = ("$vt profile_len $auxDir/all.annotated.sites.bcf -a VT_HWEAF -b VT_AB -x $plotDir/plot_len -y $plotFile  2> $logDir/profile_len.log");
+@cmd = ("$vt profile_len $auxDir/all.annotated.sites.bcf -a HWEAF -b AB -x $plotDir/plot_len -y $plotFile  2> $logDir/profile_len.log");
 makeLocalStep($tgt, $dep, @cmd);	
 
 #combine reports
