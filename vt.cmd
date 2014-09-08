@@ -1,0 +1,15 @@
+/net/fantasia/home/atks/dev/vt/pipeline/generate_gatk_calling_makefile.pl \
+-w /net/fantasia/home/atks/bipolar/20140109_twin_trio_variant_calling \
+-o run_gatk_ug_snps_indels \
+-b /net/fantasia/home/atks/bipolar/20140109_twin_trio_variant_calling/codes/vt \
+-t /net/fantasia/home/atks/programs/cluster \
+-m bipolar.twin.trio.gatk.ug.snps.indels.calling.mk \
+-c mini+ \
+-d 160 \
+-s bipolar.twin.trio.index \
+-l seq.length.txt \
+-i 1000000 \
+-r /net/bipolar/atks/ref/hs37d5.fa \
+-x UnifiedGenotyper \
+-j 4g \
+-v BOTH 
