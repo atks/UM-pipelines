@@ -10,11 +10,11 @@ use Pod::Usage;
 
 =head1 NAME
 
-generate_platypus_pipeline_makefile
+generate_platypus_calling_pipeline_makefile
 
 =head1 SYNOPSIS
 
- generate_platypus_pipeline_makefile [options]
+ generate_platypus_calling_pipeline_makefile [options]
 
   -s     sample file list giving the location of each sample
          column 1: sample name
@@ -78,7 +78,6 @@ if(!GetOptions ('h'=>\$help,
 }
 
 #programs
-#you can set the  maximum memory here to be whatever you want
 my $platypus = "/net/fantasia/home/atks/dev/vt/comparisons/programs/python_2.7.3/python /net/fantasia/home/atks/dev/vt/comparisons/programs/Platypus_0.7.8/Platypus.py";
 my $injectContigs = "/net/fantasia/home/atks/dev/vt/comparisons/programs/scripts/inject_contigs";
 my $vt = "$vtDir/vt";
@@ -203,7 +202,7 @@ my @cmd;
 #**************************
 $tgt = "$logDir/start.calling.OK";
 $dep = "";
-@cmd = ("date | awk '{print \"platypus pipeline\\n\\nstart calling: \"\$\$0}' > $logFile");
+@cmd = ("date | awk '{print \"platypus variant calling pipeline\\n\\nstart calling: \"\$\$0}' > $logFile");
 makeLocalStep($tgt, $dep, @cmd);
 
 my $intervalVCFFiles = "";
