@@ -192,6 +192,8 @@ my @cmds = ();
 my $tgt;
 my $dep;
 my @cmd;
+my $inputVCFFile;
+my $outputVCFFile;
 
 ########
 #Calling
@@ -215,7 +217,7 @@ if ($intervalWidth!=0)
     {
         my $interval = $intervals[$i];
         my $intervalName = $intervalNames[$i];        
-        my $outputVCFFile = "$vcfOutDir/$intervalName.vcf";
+        $outputVCFFile = "$vcfOutDir/$intervalName.vcf";
         $tgt = "$outputVCFFile.OK";
         $dep = "";
         @cmd = ("$platypus callVariants --bamFiles=$bamFiles --refFile=$refGenomeFASTAFile --output=$outputVCFFile --regions=$interval");
@@ -229,10 +231,18 @@ if ($intervalWidth!=0)
         $intervalVCFFiles .= " $outputVCFFile";
         $intervalVCFFileHdrsOK .= " $outputVCFFile.hdr.OK";
     }
+    
+    #************************
+    #log end time for calling
+    #************************
+    $tgt = "$logDir/end.calling.OK";
+    $dep = "$intervalVCFFileHdrsOK";
+    @cmd = ("date | awk '{print \"end calling: \"\$\$0}' >> $logFile");
+    makeLocalStep($tgt, $dep, @cmd);
 }
 else
 {
-    my $outputVCFFile = "$vcfOutDir/all.vcf.gz";
+    $outputVCFFile = "$vcfOutDir/all.vcf.gz";
     $tgt = "$outputVCFFile.OK";
     $dep = "";
     @cmd = ("$platypus callVariants --bamFiles=$bamFiles --refFile=$refGenomeFASTAFile --output=$outputVCFFile");
@@ -242,15 +252,15 @@ else
     $dep = "$outputVCFFile.OK";
     @cmd = ("$injectContigs -v $outputVCFFile -c $contigsFile");
     makeStep($tgt, $dep, @cmd);
+    
+    #************************
+    #log end time for calling
+    #************************
+    $tgt = "$logDir/end.calling.OK";
+    $dep = "$outputVCFFile.hdr.OK";
+    @cmd = ("date | awk '{print \"end calling: \"\$\$0}' >> $logFile");
+    makeLocalStep($tgt, $dep, @cmd);
 }
-
-#************************
-#log end time for calling
-#************************
-$tgt = "$logDir/end.calling.OK";
-$dep = "$intervalVCFFileHdrsOK";
-@cmd = ("date | awk '{print \"end calling: \"\$\$0}' >> $logFile");
-makeLocalStep($tgt, $dep, @cmd);
 
 ###########################################
 #Concatenate, normalize and drop duplicates
@@ -272,7 +282,8 @@ if ($intervalWidth!=0)
     for my $chrom (@CHROM)
     {
         my $inputChromosomeIntervalVCFFiles = "";
-        my $outputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
+        my $inputChromosomeIntervalVCFFileHdrsOK = "";
+        $outputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
         $chromGenotypeVCFFilesOK .= " $outputVCFFile.OK";
         $chromSiteVCFFiles .= " $finalVCFOutDir/$chrom.sites.vcf.gz";
         $chromSiteVCFFilesOK .= " $finalVCFOutDir/$chrom.sites.vcf.gz.OK";
@@ -280,6 +291,7 @@ if ($intervalWidth!=0)
         for my $interval (@{$intervalsByChrom{$chrom}})
         {
             $inputChromosomeIntervalVCFFiles .= " $vcfOutDir/$interval.vcf";
+            $inputChromosomeIntervalVCFFileHdrsOK .= " $vcfOutDir/$interval.vcf.hdr.OK";
         }
 
         $tgt = "$outputVCFFile.OK";
@@ -292,7 +304,7 @@ if ($intervalWidth!=0)
         @cmd = ("$vt index $outputVCFFile");
         makeStep($tgt, $dep, @cmd);
 
-        my $inputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
+        $inputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
         $outputVCFFile = "$finalVCFOutDir/$chrom.sites.vcf.gz";
         $tgt = "$outputVCFFile.OK";
         $dep = "$inputVCFFile.OK";
@@ -305,13 +317,13 @@ if ($intervalWidth!=0)
         makeStep($tgt, $dep, @cmd);
     }
 
-    my $outputVCFFile = "$finalVCFOutDir/all.sites.vcf.gz";
+    $outputVCFFile = "$finalVCFOutDir/all.sites.vcf.gz";
     $tgt = "$outputVCFFile.OK";
     $dep = "$chromSiteVCFFilesOK";
     @cmd = ("$vt concat $chromSiteVCFFiles -o $outputVCFFile");
     makeStep($tgt, $dep, @cmd);
 
-    my $inputVCFFile = "$finalVCFOutDir/all.sites.vcf.gz";
+    $inputVCFFile = "$finalVCFOutDir/all.sites.vcf.gz";
     $tgt = "$inputVCFFile.tbi.OK";
     $dep = "$inputVCFFile.OK";
     @cmd = ("$vt index $inputVCFFile");
@@ -335,8 +347,8 @@ else
     @cmd = ("date | awk '{print \"start normalization: \"\$\$0}' >> $logFile");
     makeLocalStep($tgt, $dep, @cmd);
 
-    my $inputVCFFile = "$vcfOutDir/all.vcf";
-    my $outputVCFFile = "$finalVCFOutDir/all.genotypes.vcf.gz";
+    $inputVCFFile = "$vcfOutDir/all.vcf";
+    $outputVCFFile = "$finalVCFOutDir/all.genotypes.vcf.gz";
     $tgt = "$outputVCFFile.OK";
     $dep = "$logDir/end.genotyping.OK";
     @cmd = ("$vt normalize -r $refGenomeFASTAFile $inputVCFFile -o + | $vt mergedups + -o $outputVCFFile ");
@@ -377,9 +389,7 @@ open(MAK,">$makeFile") || die "Cannot open $makeFile\n";
 print MAK ".DELETE_ON_ERROR:\n\n";
 print MAK "all: @tgts\n\n";
 
-######
 #clean
-######
 push(@tgts, "clean");
 push(@deps, "");
 push(@cmds, "\t-rm -rf $outputDir/*.* $vcfOutDir/*.* $vcfOutDir/*/*.* $finalVCFOutDir/*.* $statsDir/* $logDir/* $outputDir/intervals/*.*");
