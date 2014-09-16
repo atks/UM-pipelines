@@ -1,4 +1,4 @@
-/net/fantasia/home/atks/dev/vt/pipeline/generate_platypus_pipeline_makefile.pl \
+/net/fantasia/home/atks/dev/vt/pipeline/generate_platypus_calling_pipeline_makefile.pl \
 -o /net/fantasia/home/atks/dev/vt/comparisons/na12878/pl \
 -b /net/fantasia/home/atks/dev/vt/comparisons/programs/vt \
 -t /net/fantasia/home/atks/programs/cluster \
@@ -6,6 +6,6 @@
 -c mini \
 -d 5 \
 -s na12878.high_coverage.index \
--l chr20.hs37d5.seq.length.txt \
+-l hs37d5.seq.length.txt \
 -i 1000000 \
--r /net/1000g/atks/ref/genome/hs37d5.fa \
+-r /net/1000g/atks/ref/genome/hs37d5.fa 

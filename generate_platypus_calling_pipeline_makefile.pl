@@ -82,7 +82,7 @@ my $platypus = "/net/fantasia/home/atks/dev/vt/comparisons/programs/python_2.7.3
 my $injectContigs = "/net/fantasia/home/atks/dev/vt/comparisons/programs/scripts/inject_contigs";
 my $vt = "$vtDir/vt";
 
-printf("generate_platypus_pipeline_makefile.pl\n");
+printf("generate_platypus_calling_pipeline_makefile.pl\n");
 printf("\n");
 printf("options: output dir           %s\n", $outputDir);
 printf("         vt path              %s\n", $vt);
@@ -241,7 +241,7 @@ if ($intervalWidth!=0)
 }
 else
 {
-    $outputVCFFile = "$vcfOutDir/all.vcf.gz";
+    $outputVCFFile = "$vcfOutDir/all.vcf";
     $tgt = "$outputVCFFile.OK";
     $dep = "";
     @cmd = ("$platypus callVariants --bamFiles=$bamFiles --refFile=$refGenomeFASTAFile --output=$outputVCFFile");

@@ -86,7 +86,7 @@ if(!GetOptions ('h'=>\$help,
 my $gatk = "/net/fantasia/home/atks/dev/vt/comparisons/programs/jdk1.7.0_25/bin/java -jar -Xmx$jvmMemory /net/fantasia/home/atks/dev/vt/comparisons/programs/GenomeAnalysisTK-3.1-1/GenomeAnalysisTK.jar";
 my $vt = "$vtDir/vt";
 
-printf("generate_gatk_ug_calling_makefile.pl\n");
+printf("generate_gatk_unifiedgenotyper_calling_pipeline_makefile.pl\n");
 printf("\n");
 printf("options: work dir             %s\n", $workDir);
 printf("         out dir              %s\n", $outputDir);

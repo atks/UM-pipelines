@@ -10,11 +10,11 @@ use Pod::Usage;
 
 =head1 NAME
 
-generate_gatk_unifiedgenotyper_calling_pipeline_makefile
+generate_gatk_samtools_calling_pipeline_makefile
 
 =head1 SYNOPSIS
 
- generate_gatk_unifiedgenotyper_pipeline_makefile [options]
+ generate_gatk_samtools_pipeline_makefile [options]
 
   -s     sample file list giving the location of each sample
          column 1: sample name
@@ -62,9 +62,7 @@ if(!GetOptions ('h'=>\$help,
                 's:s'=>\$sampleFile,
                 'l:s'=>\$sequenceLengthFile,
                 'i:s'=>\$intervalWidth,
-                'r:s'=>\$refGenomeFASTAFile,
-                'j:s'=>\$jvmMemory,
-                'v:s'=>\$variantType
+                'r:s'=>\$refGenomeFASTAFile
                 )
   || !defined($workDir)
   || !defined($makeFile)
@@ -83,10 +81,11 @@ if(!GetOptions ('h'=>\$help,
 
 #programs
 #you can set the  maximum memory here to be whatever you want
-my $gatk = "/net/fantasia/home/atks/dev/vt/comparisons/programs/jdk1.7.0_25/bin/java -jar -Xmx$jvmMemory /net/fantasia/home/atks/dev/vt/comparisons/programs/GenomeAnalysisTK-3.1-1/GenomeAnalysisTK.jar";
+my $samtools = "/net/fantasia/home/atks/dev/vt/comparisons/programs/samtools/samtools";
+my $bcftools = "/net/fantasia/home/atks/dev/vt/comparisons/programs/bcftools/bcftools";
 my $vt = "$vtDir/vt";
 
-printf("generate_gatk_ug_calling_makefile.pl\n");
+printf("generate_samtools_calling_pipeline_makefile.pl\n");
 printf("\n");
 printf("options: work dir             %s\n", $workDir);
 printf("         out dir              %s\n", $outputDir);
@@ -99,8 +98,6 @@ printf("         sample file          %s\n", $sampleFile);
 printf("         sequence length file %s\n", $sequenceLengthFile);
 printf("         interval width       %s\n", $intervalWidth);
 printf("         reference            %s\n", $refGenomeFASTAFile);
-printf("         JVM Memory           %s\n", $jvmMemory);
-printf("         variant types        %s\n", $variantType);
 printf("\n");
 
 my $vcfOutDir = "$outputDir/vcf";
@@ -145,18 +142,10 @@ print "read in " . scalar(keys(%SAMPLE)) . " samples\n";
 ###################
 my %intervalsByChrom = ();
 my @intervals = ();
+my @intervalNames = ();
 my @intervalFiles = ();
 my @CHROM = ();
 
-my $writeIntervals = 1;
-
-if (-e "$outputDir/intervals/$intervalWidth.OK")
-{
-    print "$outputDir/intervals/$intervalWidth.OK exists, intervals wil not be generated.\n";
-    $writeIntervals = 0;
-}
-
-mkpath("$outputDir/intervals/");
 open(SQ,"$sequenceLengthFile") || die "Cannot open $sequenceLengthFile\n";
 while (<SQ>)
 {
@@ -174,32 +163,22 @@ while (<SQ>)
         for my $i (0 .. floor($len/$intervalWidth))
         {
             my $interval = "";
+            my $intervalName = "";
             my $file = "";
             if ($i<floor($len/$intervalWidth))
             {
-                $interval = $chrom . "_" . ($intervalWidth*$i+1) . "_" . ($intervalWidth*($i+1));
-                $file = "$outputDir/intervals/$interval.interval_list";
-                if ($writeIntervals)
-                {
-                    open(INTERVAL, ">$file") || die "Cannot open $file\n";
-                    print INTERVAL "$chrom:" . ($intervalWidth*$i+1) . "-" . ($intervalWidth*($i+1)) . "\n";
-                    close(INTERVAL);
-                }
+                $interval = $chrom . ":" . ($intervalWidth*$i+1) . "-" . ($intervalWidth*($i+1));
+                $intervalName = $chrom . "_" . ($intervalWidth*$i+1) . "_" . ($intervalWidth*($i+1));
             }
             else
             {
-                $interval = $chrom . "_" . ($intervalWidth*$i+1) . "_" . $len;
-                $file = "$outputDir/intervals/$interval.interval_list";
-                if ($writeIntervals)
-                {
-                    open(INTERVAL, ">$file") || die "Cannot open $file\n";
-                    print INTERVAL "$chrom:" . ($intervalWidth*$i+1) . "-" . $len . "\n";
-                    close(INTERVAL);
-                }
+                $interval = $chrom . ":" . ($intervalWidth*$i+1) . "-" . $len;
+                $intervalName = $chrom . "_" . ($intervalWidth*$i+1) . "_" . ($intervalWidth*($i+1));
             }
 
             push(@{$intervalsByChrom{$chrom}}, "$interval");
             push(@intervals, $interval);
+            push(@intervalNames, $intervalName);
             push(@intervalFiles, $file);
 
             $count++;
@@ -209,11 +188,6 @@ while (<SQ>)
     }
 }
 close(SQ);
-
-if ($writeIntervals)
-{
-    print `touch $outputDir/intervals/$intervalWidth.OK`;
-}
 
 my @tgts = ();
 my @deps = ();
@@ -241,13 +215,10 @@ if ($intervalWidth!=0)
     my $intervalVCFFilesOK = "";
     for my $i (0 .. $#intervals)
     {
-        #nct - number of computing threads
-        #interval_padding ensures that you capture Indels that lie across a boundary. Note that UnifiedGenotyper uses locuswalker.
-        #--max_alternate_alleles is set at 6 by default
-        $outputVCFFile = "$vcfOutDir/$intervals[$i].vcf";
+        $outputVCFFile = "$vcfOutDir/$intervalNames[$i].vcf.gz";
         $tgt = "$outputVCFFile.OK";
         $dep = "";
-        @cmd = ("$gatk -T UnifiedGenotyper -R $refGenomeFASTAFile -glm $variantType --interval_padding 100 -I $bamListFile --genotyping_mode DISCOVERY -o $outputVCFFile --output_mode EMIT_VARIANTS_ONLY -L $intervalFiles[$i]"),
+        @cmd = ("$samtools  mpileup -ugf $refGenomeFASTAFile -b $bamListFile -r $intervals[$i] | $bcftools call -vmO z -o $outputVCFFile"),
         makeStep($tgt, $dep, @cmd);
 
         $intervalVCFFilesOK .= " $outputVCFFile.OK";
@@ -266,7 +237,7 @@ else
     $outputVCFFile = "$vcfOutDir/all.vcf.gz";
     $tgt = "$outputVCFFile.OK";
     $dep = "";
-    @cmd = ("$gatk -T UnifiedGenotyper -R $refGenomeFASTAFile -glm $variantType -I $bamListFile --genotyping_mode DISCOVERY -o $outputVCFFile --output_mode EMIT_VARIANTS_ONLY");
+    @cmd = ("$samtools  mpileup -ugf $refGenomeFASTAFile -b $bamListFile | $bcftools call -vmO z -o $outputVCFFile");
     makeStep($tgt, $dep, @cmd);
 
     #************
@@ -304,7 +275,7 @@ if ($intervalWidth!=0)
         my $inputChromosomeIntervalVCFFiles = "";
         for my $interval (@{$intervalsByChrom{$chrom}})
         {
-            $inputChromosomeIntervalVCFFiles .= " $vcfOutDir/$interval.vcf";
+            $inputChromosomeIntervalVCFFiles .= " $vcfOutDir/$interval.vcf.gz";
         }
 
         #genotypes VCFs

@@ -2,11 +2,11 @@
 -o /net/fantasia/home/atks/dev/vt/comparisons/na12878/hc \
 -b /net/fantasia/home/atks/dev/vt/comparisons/programs/vt \
 -t /net/fantasia/home/atks/programs/cluster \
--m na12878.high_coverage.hc.calling.mk \
+-m hc.mk \
 -c mini \
 -d 80 \
 -s na12878.high_coverage.index \
--l hs37d5.seq.length.txt \
+-l chr20.hs37d5.seq.length.txt \
 -i 1000000 \
 -r /net/1000g/atks/ref/genome/hs37d5.fa \
 -j 4g \
