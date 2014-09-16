@@ -10,11 +10,11 @@ use Pod::Usage;
 
 =head1 NAME
 
-generate_gatk_samtools_calling_pipeline_makefile
+generate_samtools_calling_pipeline_makefile
 
 =head1 SYNOPSIS
 
- generate_gatk_samtools_pipeline_makefile [options]
+ generate_samtools_pipeline_makefile [options]
 
   -s     sample file list giving the location of each sample
          column 1: sample name
@@ -173,10 +173,10 @@ while (<SQ>)
             else
             {
                 $interval = $chrom . ":" . ($intervalWidth*$i+1) . "-" . $len;
-                $intervalName = $chrom . "_" . ($intervalWidth*$i+1) . "_" . ($intervalWidth*($i+1));
+                $intervalName = $chrom . "_" . ($intervalWidth*$i+1) . "_" . $len;
             }
 
-            push(@{$intervalsByChrom{$chrom}}, "$interval");
+            push(@{$intervalsByChrom{$chrom}}, "$intervalName");
             push(@intervals, $interval);
             push(@intervalNames, $intervalName);
             push(@intervalFiles, $file);
@@ -207,7 +207,7 @@ my $outputVCFFile;
 #**************
 $tgt = "$logDir/start.calling.OK";
 $dep = "";
-@cmd = ("date | awk '{print \"gatk unifiedgenotyper variant calling pipeline\\n\\nstart calling: \"\$\$0}' > $logFile");
+@cmd = ("date | awk '{print \"samtools variant calling pipeline\\n\\nstart calling: \"\$\$0}' > $logFile");
 makeLocalStep($tgt, $dep, @cmd);
 
 if ($intervalWidth!=0)
