@@ -97,7 +97,15 @@ printf("         reference            %s\n", $refGenomeFASTAFile);
 printf("         JVM Memory           %s\n", $jvmMemory);
 printf("\n");
 
-mkpath($outputDir);
+my $vcfOutDir = "$outputDir/vcf";
+mkpath($vcfOutDir);
+my $finalVCFOutDir = "$outputDir/final";
+mkpath($finalVCFOutDir);
+my $statsDir = "$outputDir/stats";
+mkpath($statsDir);
+my $logDir = "$outputDir/log";
+mkpath($logDir);
+my $logFile = "$outputDir/run.log";
 
 ########################################
 #Read file locations and name of samples
@@ -123,15 +131,6 @@ close(SA);
 print "\"$bamFiles\"";
 
 print "read in " . scalar(keys(%SAMPLE)) . " samples\n";
-my $vcfOutDir = "$outputDir/vcf";
-mkpath($vcfOutDir);
-my $finalVCFOutDir = "$outputDir/final";
-mkpath($finalVCFOutDir);
-my $statsDir = "$outputDir/stats";
-mkpath($statsDir);
-my $logDir = "$outputDir/log";
-mkpath($logDir);
-my $logFile = "$outputDir/run.log";
 
 ###################
 #Generate intervals
@@ -294,6 +293,7 @@ if ($intervalWidth!=0)
             $inputChromosomeIntervalVCFFileHdrsOK .= " $vcfOutDir/$interval.vcf.hdr.OK";
         }
 
+        #genotypes VCFs
         $tgt = "$outputVCFFile.OK";
         $dep = "$logDir/end.calling.OK";
         @cmd = ("$vt concat $inputChromosomeIntervalVCFFiles | $vt normalize -r $refGenomeFASTAFile - 2> $statsDir/$chrom.normalize.log | $vt mergedups - -o $outputVCFFile 2> $statsDir/$chrom.mergedups.log");
@@ -304,6 +304,7 @@ if ($intervalWidth!=0)
         @cmd = ("$vt index $outputVCFFile");
         makeStep($tgt, $dep, @cmd);
 
+        #sites VCFs
         $inputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
         $outputVCFFile = "$finalVCFOutDir/$chrom.sites.vcf.gz";
         $tgt = "$outputVCFFile.OK";

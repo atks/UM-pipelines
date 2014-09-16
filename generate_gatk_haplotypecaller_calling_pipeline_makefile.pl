@@ -463,15 +463,13 @@ open(MAK,">$makeFile") || die "Cannot open $makeFile\n";
 print MAK ".DELETE_ON_ERROR:\n\n";
 print MAK "all: @tgts\n\n";
 
-######
 #clean
-######
 push(@tgts, "clean");
 push(@deps, "");
 push(@cmds, "\t-rm -rf $outputDir/*.* $vcfOutDir/*/*.* $finalVCFOutDir/*.* $logDir/* $outputDir/intervals/*.*");
 
 for(my $i=0; $i < @tgts; ++$i) {
-    print MAK "$tgts[$i]: $deps[$i]\n";
+    print MAK "$tgts[$i] : $deps[$i]\n";
     print MAK "$cmds[$i]\n";
 }
 close MAK;
