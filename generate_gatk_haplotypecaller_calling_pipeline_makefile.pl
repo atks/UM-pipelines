@@ -97,7 +97,13 @@ printf("         reference            %s\n", $refGenomeFASTAFile);
 printf("         JVM Memory           %s\n", $jvmMemory);
 printf("\n");
 
-mkpath($outputDir);
+my $vcfOutDir = "$outputDir/vcf";
+mkpath($vcfOutDir);
+my $finalVCFOutDir = "$outputDir/final";
+mkpath($finalVCFOutDir);
+my $logDir = "$outputDir/log";
+mkpath($logDir);
+my $logFile = "$outputDir/run.log";
 
 ########################################
 #Read file locations and name of samples
@@ -120,13 +126,6 @@ while (<SA>)
 close(SA);
 
 print "read in " . scalar(keys(%SAMPLE)) . " samples\n";
-my $vcfOutDir = "$outputDir/vcf";
-mkpath($vcfOutDir);
-my $finalVCFOutDir = "$outputDir/final";
-mkpath($finalVCFOutDir);
-my $logDir = "$outputDir/log";
-mkpath($logDir);
-my $logFile = "$outputDir/run.log";
 
 ###################
 #Generate intervals
@@ -210,6 +209,8 @@ my @cmds = ();
 my $tgt;
 my $dep;
 my @cmd;
+my $inputVCFFile;
+my $outputVCFFile;
 
 ##########
 #Discovery
@@ -236,7 +237,7 @@ if ($intervalWidth!=0)
         for my $sampleID (@sample)
         {
             mkpath("$vcfOutDir/$sampleID");
-            my $outputVCFFile = "$vcfOutDir/$sampleID/$sampleID.$interval.vcf";
+            $outputVCFFile = "$vcfOutDir/$sampleID/$sampleID.$interval.vcf";
             $tgt = "$outputVCFFile.OK";
             $dep = "";
             @cmd = ("$gatk -T HaplotypeCaller -R $refGenomeFASTAFile -I $SAMPLE{$sampleID} " .
@@ -254,7 +255,7 @@ else
 {
     for my $sampleID (@sample)
     {
-        my $outputVCFFile = "$vcfOutDir/$sampleID/$sampleID.vcf";
+        $outputVCFFile = "$vcfOutDir/$sampleID/$sampleID.vcf";
         $tgt = "$outputVCFFile.OK";
         $dep = "";
         @cmd = ("$gatk -T HaplotypeCaller -R $refGenomeFASTAFile -I $SAMPLE{$sampleID} " .
@@ -293,7 +294,7 @@ if ($intervalWidth!=0)
 {
     for my $interval (@intervals)
     {
-        my $outputVCFFile = "$vcfOutDir/$interval.vcf";
+        $outputVCFFile = "$vcfOutDir/$interval.vcf";
         $tgt = "$outputVCFFile.OK";
         $dep = "$logDir/start.combining_gvcfs.OK";;
         @cmd = ("$gatk -T CombineGVCFs -R $refGenomeFASTAFile $GVCFFilesByInterval{$interval} -o $outputVCFFile");
@@ -304,7 +305,7 @@ if ($intervalWidth!=0)
 }
 else
 {
-    my $outputVCFFile = "$vcfOutDir/all.vcf";
+    $outputVCFFile = "$vcfOutDir/all.vcf";
     $tgt = "$outputVCFFile.OK";
     $dep = "$logDir/start.combining_gvcfs.OK";;
     @cmd = ("$gatk -T CombineGVCFs -R $refGenomeFASTAFile $GVCFFiles -o $outputVCFFile");
@@ -339,8 +340,8 @@ if ($intervalWidth!=0)
 {
     for my $interval (@intervals)
     {
-        my $inputVCFFile = "$vcfOutDir/$interval.vcf";
-        my $outputVCFFile = "$vcfOutDir/$interval.genotypes.vcf";
+        $inputVCFFile = "$vcfOutDir/$interval.vcf";
+        $outputVCFFile = "$vcfOutDir/$interval.genotypes.vcf";
         $tgt = "$outputVCFFile.OK";
         $dep = "$inputVCFFile.OK";
         @cmd = ("$gatk -T GenotypeGVCFs -R $refGenomeFASTAFile --variant $inputVCFFile -o $outputVCFFile");
@@ -351,8 +352,8 @@ if ($intervalWidth!=0)
 }
 else
 {
-    my $inputVCFFile = "$vcfOutDir/all.vcf";
-    my $outputVCFFile = "$finalVCFOutDir/all.genotypes.vcf";
+    $inputVCFFile = "$vcfOutDir/all.vcf";
+    $outputVCFFile = "$finalVCFOutDir/all.genotypes.vcf";
     $tgt = "$outputVCFFile.OK";
     $dep = "$inputVCFFile.OK";
     @cmd = ("$gatk -T CombineGVCFs -R $refGenomeFASTAFile --variant $inputVCFFile -o $outputVCFFile");
@@ -396,7 +397,7 @@ if ($intervalWidth!=0)
             $inputGenotypeVCFFilesOK .= " $vcfOutDir/$interval.genotypes.vcf.OK";
         }
 
-        my $outputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
+        $outputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
         $tgt = "$outputVCFFile.OK";
         $dep = "$inputGenotypeVCFFilesOK";
         @cmd = ("$vt concat $inputGenotypeVCFFiles -o + | $vt normalize -r $refGenomeFASTAFile + -o + | $vt mergedups + -o $outputVCFFile ");
@@ -407,7 +408,7 @@ if ($intervalWidth!=0)
         @cmd = ("$vt index $outputVCFFile");
         makeStep($tgt, $dep, @cmd);
 
-        my $inputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
+        $inputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
         $outputVCFFile = "$finalVCFOutDir/$chrom.sites.vcf.gz";
         $tgt = "$outputVCFFile.OK";
         $dep = "$inputVCFFile.OK";
@@ -440,8 +441,8 @@ else
     @cmd = ("date | awk '{print \"start normalization: \"\$\$0}' >> $logFile");
     makeLocalStep($tgt, $dep, @cmd);
 
-    my $inputVCFFile = "$vcfOutDir/all.vcf";
-    my $outputVCFFile = "$finalVCFOutDir/all.genotypes.vcf.gz";
+    $inputVCFFile = "$vcfOutDir/all.vcf";
+    $outputVCFFile = "$finalVCFOutDir/all.genotypes.vcf.gz";
     $tgt = "$outputVCFFile.OK";
     $dep = "$inputVCFFile.OK";
     @cmd = ("$vt normalize -r $refGenomeFASTAFile $inputVCFFile -o + | $vt mergedups + -o $outputVCFFile ");

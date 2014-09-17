@@ -33,26 +33,22 @@ This script generates the make file to discovery and genotype a set of individua
 
 my $help;
 
-my $workDir = "";
-my $outputDir = "run";
-my $vtDir = "";
-my $clusterDir = "";
-my $makeFile = "Makefile";
-my $cluster = "main";
-my $sleep = 0;
-my $sampleFile = "";
-my $intervals = "";
-my $sequenceLengthFile = "/net/fantasia/home/atks/dev/vt/pipeline/seq_length.txt";
+my $outputDir;
+my $vtDir;
+my $clusterDir;
+my $makeFile;
+my $cluster;
+my $sleep;
+my $sampleFile;
+my $sequenceLengthFile;
 my $intervalWidth = 1000000;
-my $refGenomeFASTAFile = "";
-my $jvmMemory = "2g";
-my $variantType = "BOTH";
+my $refGenomeFASTAFile;
+my $variantType;
 
 #initialize options
 Getopt::Long::Configure ('bundling');
 
 if(!GetOptions ('h'=>\$help,
-                'w:s'=>\$workDir,
                 'o:s'=>\$outputDir,
                 'b:s'=>\$vtDir,
                 't:s'=>\$clusterDir,
@@ -64,7 +60,6 @@ if(!GetOptions ('h'=>\$help,
                 'i:s'=>\$intervalWidth,
                 'r:s'=>\$refGenomeFASTAFile
                 )
-  || !defined($workDir)
   || !defined($makeFile)
   || !defined($sampleFile)
   || !defined($refGenomeFASTAFile))
@@ -87,8 +82,7 @@ my $vt = "$vtDir/vt";
 
 printf("generate_samtools_calling_pipeline_makefile.pl\n");
 printf("\n");
-printf("options: work dir             %s\n", $workDir);
-printf("         out dir              %s\n", $outputDir);
+printf("options: output dir           %s\n", $outputDir);
 printf("         vt path              %s\n", $vt);
 printf("         cluster path         %s\n", $clusterDir);
 printf("         make file            %s\n", $makeFile);
