@@ -423,6 +423,20 @@ if ($intervalWidth!=0)
         makeStep($tgt, $dep, @cmd);
     }
 
+    my $inputVCFFiles = join(" ", map {"$finalVCFOutDir/$_.sites.vcf.gz"} @CHROM);
+    my $inputVCFFilesOK = join(" ", map {"$finalVCFOutDir/$_.sites.vcf.gz.OK"} @CHROM);
+    $outputVCFFile = "$finalVCFOutDir/all.sites.vcf.gz";
+    $tgt = "$outputVCFFile.OK";
+    $dep = "$inputVCFFilesOK";
+    @cmd = ("$vt concat $inputVCFFiles -o $outputVCFFile");
+    makeStep($tgt, $dep, @cmd);
+
+    $inputVCFFile = "$finalVCFOutDir/all.sites.vcf.gz";
+    $tgt = "$inputVCFFile.tbi.OK";
+    $dep = "$inputVCFFile.OK";
+    @cmd = ("$vt index $inputVCFFile");
+    makeStep($tgt, $dep, @cmd);
+
     #***********************************************
     #log end time for concating and normalizing VCFs
     #***********************************************
