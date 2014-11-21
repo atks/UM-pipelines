@@ -39,7 +39,7 @@ my $clusterDir;
 my $makeFile;
 my $cluster;
 my $sleep;
-my $sampleFile;
+my $fastqListFile;
 my $sequenceLengthFile;
 my $intervalWidth = 1000000;
 my $refGenomeFASTAFile;
@@ -55,13 +55,13 @@ if(!GetOptions ('h'=>\$help,
                 'm:s'=>\$makeFile,
                 'c:s'=>\$cluster,
                 'd:s'=>\$sleep,
-                'f:s'=>\$fastqFile,
+                'f:s'=>\$fastqListFile,
                 'l:s'=>\$sequenceLengthFile,
                 'i:s'=>\$intervalWidth,
                 'r:s'=>\$refGenomeFASTAFile
                 )
   || !defined($makeFile)
-  || !defined($sampleFile)
+  || !defined($fastqListFile)
   || !defined($refGenomeFASTAFile))
 {
     if ($help)
@@ -80,7 +80,7 @@ my $samtools = "/net/fantasia/home/atks/dev/vt/comparisons/programs/samtools/sam
 my $bcftools = "/net/fantasia/home/atks/dev/vt/comparisons/programs/bcftools/bcftools";
 my $vt = "$vtDir/vt";
 
-my $/net/fantasia/home/atks/dev/vt/comparisons/programs/lobSTR-3.0.2
+my $lobstr = "/net/fantasia/home/atks/dev/vt/comparisons/programs/lobSTR-3.0.2/bin/lobSTR";
 
 printf("generate_samtools_calling_pipeline_makefile.pl\n");
 printf("\n");
@@ -90,7 +90,7 @@ printf("         cluster path         %s\n", $clusterDir);
 printf("         make file            %s\n", $makeFile);
 printf("         cluster              %s\n", $cluster);
 printf("         sleep                %s\n", $sleep);
-printf("         sample file          %s\n", $sampleFile);
+printf("         sample file          %s\n", $fastqListFile);
 printf("         sequence length file %s\n", $sequenceLengthFile);
 printf("         interval width       %s\n", $intervalWidth);
 printf("         reference            %s\n", $refGenomeFASTAFile);
@@ -114,28 +114,30 @@ my $logFile = "$outputDir/run.log";
 #Read file locations and name of samples
 ########################################
 my %SAMPLE = ();
-open(SA,"$fastqFile") || die "Cannot open $fastqFile\n";
+open(SA,"$fastqListFile") || die "Cannot open $fastqListFile\n";
 my $bamFiles = "";
+my @samples = ();
 while (<SA>)
 {
     s/\r?\n?$//;
     if(!/^#/)
     {
         my ($sampleID, $fastq1Path, $fastq2Path) = split(/\s+/, $_);
+        
         if (!exists($SAMPLE{$sampleID}))
         {
             $SAMPLE{$sampleID}{FASTQ1} = ();
             $SAMPLE{$sampleID}{FASTQ1} = ();
             $SAMPLE{$sampleID}{BAM} = ();
-            
+            push(@samples, $sampleID);
         }
         
-        my $no = scalar(@{$SAMPLE{$sampleID}{FASTQ1}}) + 1;
+        my $no = scalar(\@{$SAMPLE{$sampleID}{FASTQ1}}) + 1;
         
         push(@{$SAMPLE{$sampleID}{FASTQ1}}, $fastq1Path);
         push(@{$SAMPLE{$sampleID}{FASTQ2}}, $fastq2Path);
-        push(@{$SAMPLE{$sampleID}{BAM}}, "$bamDir/$sampleID_$no.bam");
-        $bamFiles .= "$bamPath\n";
+        push(@{$SAMPLE{$sampleID}{BAM}}, "$bamDir/$sampleID" . "_" . "$no.bam");
+        $bamFiles .= "$bamDir/$sampleID" . "_" . "$no.bam\n";
     }
 }
 close(SA);
@@ -208,41 +210,46 @@ my @cmd;
 my $inputVCFFile;
 my $outputVCFFile;
 
-
 ##########
 #Alignment
 ##########
 
-#**************
-#log start time
-#**************
+#****************************
+#log start time for alignment
+#****************************
 $tgt = "$logDir/start.alignment.OK";
 $dep = "";
 @cmd = ("date | awk '{print \"lobSTR variant calling pipeline\\n\\nstart calling: \"\$\$0}' > $logFile");
 makeLocalStep($tgt, $dep, @cmd);
 
-if ($intervalWidth!=0)
+my $bamFilesOK = "";
+
+for my $sampleID (@samples)
 {
-    my $intervalVCFFilesOK = "";
-    for my $i (0 .. $#intervals)
+    my @fastq1 = \@{$SAMPLE{$sampleID}{FASTQ1}};
+    my @fastq2 = \@{$SAMPLE{$sampleID}{FASTQ2}};
+    my @bams = \@{$SAMPLE{$sampleID}{BAM}};
+    
+    for my $i (0 .. $#fastq1)
     {
         $outputVCFFile = "$vcfOutDir/$intervalNames[$i].vcf.gz";
         $tgt = "$outputVCFFile.OK";
         $dep = "";
         @cmd = ("$samtools  mpileup -ugf $refGenomeFASTAFile -b $bamListFile -r $intervals[$i] | $bcftools call -vmO z -o $outputVCFFile"),
         makeStep($tgt, $dep, @cmd);
-
-        $intervalVCFFilesOK .= " $outputVCFFile.OK";
+        
+        $bamFilesOK .= " $bams[$i].OK";
     }
-
-    #************
-    #log end time
-    #************
-    $tgt = "$logDir/end.alignment.OK";
-    $dep = "$intervalVCFFilesOK";
-    @cmd = ("date | awk '{print \"end: \"\$\$0}' >> $logFile");
-    makeLocalStep($tgt, $dep, @cmd);
 }
+
+#************
+#log end time
+#************
+$tgt = "$logDir/end.alignment.OK";
+$dep = "$bamFilesOK";
+@cmd = ("date | awk '{print \"end: \"\$\$0}' >> $logFile");
+makeLocalStep($tgt, $dep, @cmd);
+
 
 ############################
 #Concatenate bams by samples
