@@ -3,7 +3,7 @@
 -b /net/fantasia/home/atks/dev/vt/comparisons/programs/vt \
 -t /net/fantasia/home/atks/programs/cluster \
 -m hc.mk \
--c mini \
+-c mini+ \
 -d 80 \
 -s na12878.high_coverage.index \
 -l chr20.hs37d5.seq.length.txt \

@@ -27,7 +27,7 @@ generate_lobstr_calling_pipeline_makefile
 
 =head1 DESCRIPTION
 
-This script generates the make file to discovery and genotype a set of individuals.
+This script generates the make file to discovery and genotype a set of individuals for lobSTR.
 
 =cut
 
@@ -81,6 +81,7 @@ my $bcftools = "/net/fantasia/home/atks/dev/vt/comparisons/programs/bcftools/bcf
 my $vt = "$vtDir/vt";
 
 my $lobstr = "/net/fantasia/home/atks/dev/vt/comparisons/programs/lobSTR-3.0.2/bin/lobSTR";
+my $lobstrResourcePrefix = "/net/fantasia/home/atks/dev/vt/comparisons/programs/lobSTR-3.0.2/resource/lobstr_v3.0.2_hg19_ref/lobSTR_";
 
 printf("generate_samtools_calling_pipeline_makefile.pl\n");
 printf("\n");
@@ -122,22 +123,28 @@ while (<SA>)
     s/\r?\n?$//;
     if(!/^#/)
     {
-        my ($sampleID, $fastq1Path, $fastq2Path) = split(/\s+/, $_);
+        my ($sampleID, $readGroup, $fastq1Path, $fastq2Path) = split(/\s+/, $_);
         
         if (!exists($SAMPLE{$sampleID}))
         {
             $SAMPLE{$sampleID}{FASTQ1} = ();
             $SAMPLE{$sampleID}{FASTQ1} = ();
+            $SAMPLE{$sampleID}{READGROUP} = ();
             $SAMPLE{$sampleID}{BAM} = ();
+            $SAMPLE{$sampleID}{N} = 0;
             push(@samples, $sampleID);
         }
         
-        my $no = scalar(\@{$SAMPLE{$sampleID}{FASTQ1}}) + 1;
+        my $no = $SAMPLE{$sampleID}{N}+1;
         
         push(@{$SAMPLE{$sampleID}{FASTQ1}}, $fastq1Path);
         push(@{$SAMPLE{$sampleID}{FASTQ2}}, $fastq2Path);
-        push(@{$SAMPLE{$sampleID}{BAM}}, "$bamDir/$sampleID" . "_" . "$no.bam");
-        $bamFiles .= "$bamDir/$sampleID" . "_" . "$no.bam\n";
+        push(@{$SAMPLE{$sampleID}{READGROUP}}, $readGroup);
+        my $bamFilePrefix = $fastq1Path;
+        $bamFilePrefix =~ s/\.fastq.*//; 
+        push(@{$SAMPLE{$sampleID}{BAM}}, $bamFilePrefix);
+        ++$SAMPLE{$sampleID}{N};
+        $bamFiles .= "$bamFilePrefix.bam\n";
     }
 }
 close(SA);
@@ -226,20 +233,32 @@ my $bamFilesOK = "";
 
 for my $sampleID (@samples)
 {
-    my @fastq1 = \@{$SAMPLE{$sampleID}{FASTQ1}};
-    my @fastq2 = \@{$SAMPLE{$sampleID}{FASTQ2}};
-    my @bams = \@{$SAMPLE{$sampleID}{BAM}};
+    my @fastq1 = @{$SAMPLE{$sampleID}{FASTQ1}};
+    my @fastq2 = @{$SAMPLE{$sampleID}{FASTQ2}};
+    my @readGroups = @{$SAMPLE{$sampleID}{READGROUP}};
+    my @bams = @{$SAMPLE{$sampleID}{BAM}};
     
     for my $i (0 .. $#fastq1)
     {
-        $outputVCFFile = "$vcfOutDir/$intervalNames[$i].vcf.gz";
-        $tgt = "$outputVCFFile.OK";
-        $dep = "";
-        @cmd = ("$samtools  mpileup -ugf $refGenomeFASTAFile -b $bamListFile -r $intervals[$i] | $bcftools call -vmO z -o $outputVCFFile"),
+        my $outputBAMFile = "$bams[$i]";
+        $tgt = "$outputBAMFile.OK";
+        $dep = "$fastq1[$i] $fastq2[$i]";
+        @cmd = ("$lobstr --gzip -q --p1 $fastq1[$i] --p2 $fastq2[$i] --index-prefix $lobstrResourcePrefix --rg-sample NA12878 --rg-lib $readGroups[$i] -o $outputBAMFile"),
         makeStep($tgt, $dep, @cmd);
         
         $bamFilesOK .= " $bams[$i].OK";
     }
+    
+#    $outputBAMFile = "$sampleID.bam";
+#    $tgt = "$outputBAMFile.OK";
+#    $dep = "$fastq1[$i] $fastq2[$i]";
+#    @cmd = ("$samtool cat -b $sampleBAMListFile | $samtool sort -f -o outputBAMFILE"),
+        
+    
+    #concatenate and sort
+    
+    #index
+    
 }
 
 #************
