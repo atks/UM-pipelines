@@ -17,7 +17,7 @@ generate_lobstr_calling_pipeline_makefile
  generate_lobstr_pipeline_makefile [options]
 
   -f     fastq file list giving the location of each sample
-         column 1: fastq file containing 
+         column 1: fastq file containing
          column 2: path of bam file
   -r     reference genome file
   -l     sequence length file
@@ -81,7 +81,11 @@ my $bcftools = "/net/fantasia/home/atks/dev/vt/comparisons/programs/bcftools/bcf
 my $vt = "$vtDir/vt";
 
 my $lobstr = "/net/fantasia/home/atks/dev/vt/comparisons/programs/lobSTR-3.0.2/bin/lobSTR";
+my $lobstr_allelotype = "/net/fantasia/home/atks/dev/vt/comparisons/programs/lobSTR-3.0.2/bin/allelotype";
 my $lobstrResourcePrefix = "/net/fantasia/home/atks/dev/vt/comparisons/programs/lobSTR-3.0.2/resource/lobstr_v3.0.2_hg19_ref/lobSTR_";
+my $lobstrResourceChromSizeTabFile = "$lobstrResourcePrefix/chromsizes.tab";
+my $lobstrSTRInfo = "/net/fantasia/home/atks/dev/vt/comparisons/programs/lobSTR-3.0.2/resource/lobstr_v3.0.2_hg19_strinfo.tab";
+my $lobstrSTRPCRFreeModel = "/net/fantasia/home/atks/dev/vt/comparisons/programs/lobSTR-3.0.2/share/lobSTR/models/illumina_v3.pcrfree";
 
 printf("generate_samtools_calling_pipeline_makefile.pl\n");
 printf("\n");
@@ -101,8 +105,8 @@ my $bamDir = "$outputDir/bam";
 mkpath($bamDir);
 my $vcfOutDir = "$outputDir/vcf";
 mkpath($vcfOutDir);
-my $finalVCFOutDir = "$outputDir/final";
-mkpath($finalVCFOutDir);
+my $finalDir = "$outputDir/final";
+mkpath($finalDir);
 my $statsDir = "$outputDir/stats";
 mkpath($statsDir);
 my $logDir = "$outputDir/log";
@@ -116,7 +120,6 @@ my $logFile = "$outputDir/run.log";
 ########################################
 my %SAMPLE = ();
 open(SA,"$fastqListFile") || die "Cannot open $fastqListFile\n";
-my $bamFiles = "";
 my @samples = ();
 while (<SA>)
 {
@@ -124,35 +127,35 @@ while (<SA>)
     if(!/^#/)
     {
         my ($sampleID, $readGroup, $fastq1Path, $fastq2Path) = split(/\s+/, $_);
-        
+
         if (!exists($SAMPLE{$sampleID}))
         {
             $SAMPLE{$sampleID}{FASTQ1} = ();
             $SAMPLE{$sampleID}{FASTQ1} = ();
             $SAMPLE{$sampleID}{READGROUP} = ();
-            $SAMPLE{$sampleID}{BAM} = ();
+            $SAMPLE{$sampleID}{BAM_PREFIX} = ();
             $SAMPLE{$sampleID}{N} = 0;
             push(@samples, $sampleID);
         }
-        
+
         my $no = $SAMPLE{$sampleID}{N}+1;
-        
+
         push(@{$SAMPLE{$sampleID}{FASTQ1}}, $fastq1Path);
         push(@{$SAMPLE{$sampleID}{FASTQ2}}, $fastq2Path);
         push(@{$SAMPLE{$sampleID}{READGROUP}}, $readGroup);
+        my ($name, $path, $suffix) = fileparse($fastq1Path, (".fastq.gz", ".fastq"));
         my $bamFilePrefix = $fastq1Path;
-        $bamFilePrefix =~ s/\.fastq.*//; 
-        push(@{$SAMPLE{$sampleID}{BAM}}, $bamFilePrefix);
+        $bamFilePrefix = "$bamDir/$name";
+        push(@{$SAMPLE{$sampleID}{BAM_PREFIX}}, $bamFilePrefix);
         ++$SAMPLE{$sampleID}{N};
-        $bamFiles .= "$bamFilePrefix.bam\n";
     }
 }
 close(SA);
 
-my $bamListFile = "$auxDir/bam.list";
-open(OUT,">$bamListFile") || die "Cannot open $bamListFile\n";
-print OUT $bamFiles;
-close(OUT);
+#my $bamListFile = "$auxDir/bam.list";
+#open(OUT,">$bamListFile") || die "Cannot open $bamListFile\n";
+#print OUT $bamFiles;
+#close(OUT);
 
 print "read in " . scalar(keys(%SAMPLE)) . " samples\n";
 
@@ -229,229 +232,111 @@ $dep = "";
 @cmd = ("date | awk '{print \"lobSTR variant calling pipeline\\n\\nstart calling: \"\$\$0}' > $logFile");
 makeLocalStep($tgt, $dep, @cmd);
 
+my $bamFiles = "";
 my $bamFilesOK = "";
+my $sampleBAMFileIndicesOK = "";
 
 for my $sampleID (@samples)
 {
     my @fastq1 = @{$SAMPLE{$sampleID}{FASTQ1}};
     my @fastq2 = @{$SAMPLE{$sampleID}{FASTQ2}};
     my @readGroups = @{$SAMPLE{$sampleID}{READGROUP}};
-    my @bams = @{$SAMPLE{$sampleID}{BAM}};
-    
+    my @bam_prefixes = @{$SAMPLE{$sampleID}{BAM_PREFIX}};
+
     for my $i (0 .. $#fastq1)
     {
-        my $outputBAMFile = "$bams[$i]";
+        my $outputBAMFilePrefix = "$bam_prefixes[$i]";
+        my $outputBAMFile = "$bam_prefixes[$i].aligned.bam";
         $tgt = "$outputBAMFile.OK";
         $dep = "$fastq1[$i] $fastq2[$i]";
-        @cmd = ("$lobstr --gzip -q --p1 $fastq1[$i] --p2 $fastq2[$i] --index-prefix $lobstrResourcePrefix --rg-sample NA12878 --rg-lib $readGroups[$i] -o $outputBAMFile"),
+        @cmd = ("$lobstr --gzip -q --p1 $fastq1[$i] --p2 $fastq2[$i] --index-prefix $lobstrResourcePrefix --rg-sample NA12878 --rg-lib $readGroups[$i] -o $outputBAMFilePrefix");
         makeStep($tgt, $dep, @cmd);
-        
-        $bamFilesOK .= " $bams[$i].OK";
+
+        $bamFiles .= " $outputBAMFile";
+        $bamFilesOK .= " $outputBAMFile.OK";
     }
+
+    #generate new header  - write a seprate script to do this, the SQ order must follow the BAM file!
+    my $newHeaderSAMFile = "$bamDir/$sampleID.sam";
+    open(OUT,">$newHeaderSAMFile") || die "Cannot open $newHeaderSAMFile\n";
+    open(CHROM,"$lobstrResourceChromSizeTabFile") || die "Cannot open $lobstrResourceChromSizeTabFile\n";
     
-#    $outputBAMFile = "$sampleID.bam";
-#    $tgt = "$outputBAMFile.OK";
-#    $dep = "$fastq1[$i] $fastq2[$i]";
-#    @cmd = ("$samtool cat -b $sampleBAMListFile | $samtool sort -f -o outputBAMFILE"),
-        
-    
+    print OUT "@HD\tVN:1.3\n";
+    while(<CHROM>)
+    {
+        chomp;
+        my ($chrom, $len) = split("\t");
+        print OUT "@SQ\tSN:$chrom\tLN:$len\n";
+    }
+    close(CHROM);    
+    for my $rg(@readGroups)
+    {
+        print OUT "@RG\tID:lobSTR;NA12878;$rg\tLB:$rg\tSM:NA12878\n";
+    }
+    close(OUT);
+
     #concatenate and sort
+    my $outputBAMFilePrefix = "$bamDir/$sampleID";
+    my $outputBAMFile = "$bamDir/$sampleID.bam";
+    $tgt = "$outputBAMFile.OK";
+    $dep = "$bamFilesOK";
+    @cmd = ("$samtools cat -h $newHeaderSAMFile -o - $bamFiles | $samtools sort - $outputBAMFilePrefix"),
+    makeStep($tgt, $dep, @cmd);
     
     #index
+    my $inputBAMFile = "$bamDir/$sampleID.bam";
+    $tgt = "$inputBAMFile.bai.OK";
+    $dep = "$inputBAMFile.OK";
+    @cmd = ("$samtools index $inputBAMFile"),
+    makeStep($tgt, $dep, @cmd);
     
+    $sampleBAMFileIndicesOK = " $inputBAMFile.bai.OK";
 }
 
-#************
-#log end time
-#************
+#**************************
+#log end time for alignment
+#**************************
 $tgt = "$logDir/end.alignment.OK";
-$dep = "$bamFilesOK";
+$dep = "$sampleBAMFileIndicesOK";
 @cmd = ("date | awk '{print \"end: \"\$\$0}' >> $logFile");
 makeLocalStep($tgt, $dep, @cmd);
 
+#############
+#Allelotyping
+#############
 
-############################
-#Concatenate bams by samples
-############################
+#*******************************
+#log start time for allelotyping
+#*******************************
+$tgt = "$logDir/start.allelotyping.OK";
+$dep = "$logDir/end.alignment.OK";
+@cmd = ("date | awk '{print \"start allelotyping: \"\$\$0}' > $logFile");
+makeLocalStep($tgt, $dep, @cmd);
 
-#concatenate
-
-#sort
+my $inputBAMFiles = join(",", map {"$bamDir/$_.bam"} @samples);
+my $outputVCFFilePrefix = "$finalDir/all";
+$tgt = "$outputVCFFilePrefix.vcf.gz.OK";
+$dep = join(" ", map {"$bamDir/$_.bam.OK"} @samples);
+@cmd = ("$lobstr_allelotype --command classify --bam $inputBAMFiles --index-prefix $lobstrResourcePrefix --strinfo $lobstrSTRInfo --noise_model $lobstrSTRPCRFreeModel --out $outputVCFFilePrefix");
+makeStep($tgt, $dep, @cmd);
 
 #index
+$inputVCFFile = "$finalDir/all.vcf.gz";
+$tgt = "$inputVCFFile.tbi.OK";
+$dep = "$inputVCFFile.OK";
+@cmd = ("$vt index $inputVCFFile"),
+makeStep($tgt, $dep, @cmd);
 
-#########
-##Calling
-#########
-#
-##**************
-##log start time
-##**************
-#$tgt = "$logDir/start.alignment.OK";
-#$dep = "";
-#@cmd = ("date | awk '{print \"lobSTR variant calling pipeline\\n\\nstart calling: \"\$\$0}' > $logFile");
-#makeLocalStep($tgt, $dep, @cmd);
-#
-#if ($intervalWidth!=0)
-#{
-#    my $intervalVCFFilesOK = "";
-#    for my $i (0 .. $#intervals)
-#    {
-#        $outputVCFFile = "$vcfOutDir/$intervalNames[$i].vcf.gz";
-#        $tgt = "$outputVCFFile.OK";
-#        $dep = "";
-#        @cmd = ("$samtools  mpileup -ugf $refGenomeFASTAFile -b $bamListFile -r $intervals[$i] | $bcftools call -vmO z -o $outputVCFFile"),
-#        makeStep($tgt, $dep, @cmd);
-#
-#        $intervalVCFFilesOK .= " $outputVCFFile.OK";
-#    }
-#
-#    #************
-#    #log end time
-#    #************
-#    $tgt = "$logDir/end.calling.OK";
-#    $dep = "$intervalVCFFilesOK";
-#    @cmd = ("date | awk '{print \"end: \"\$\$0}' >> $logFile");
-#    makeLocalStep($tgt, $dep, @cmd);
-#}
-#else
-#{
-#    $outputVCFFile = "$vcfOutDir/all.vcf.gz";
-#    $tgt = "$outputVCFFile.OK";
-#    $dep = "";
-#    @cmd = ("$samtools  mpileup -ugf $refGenomeFASTAFile -b $bamListFile | $bcftools call -vmO z -o $outputVCFFile");
-#    makeStep($tgt, $dep, @cmd);
-#
-#    #************
-#    #log end time
-#    #************
-#    $tgt = "$logDir/end.calling.OK";
-#    $dep = "$outputVCFFile.OK";
-#    @cmd = ("date | awk '{print \"end calling: \"\$\$0}' >> $logFile");
-#    makeLocalStep($tgt, $dep, @cmd);
-#}
+#add post processing to add sequences, fix chromosome names (should be fixed based on resource files), REF not to be empty and sorting of sequences.
 
-###########################################
-#Concatenate, normalize and drop duplicates
-###########################################
-#
-#if ($intervalWidth!=0)
-#{
-#    #**************
-#    #log start time
-#    #**************
-#    $tgt = "$logDir/start.concatenating.normalizing.OK";
-#    $dep = "$logDir/end.calling.OK";
-#    @cmd = ("date | awk '{print \"start concatenating and normalizing: \"\$\$0}' >> $logFile");
-#    makeLocalStep($tgt, $dep, @cmd);
-#
-#    my $chromSiteVCFFiles = "";
-#    my $chromSiteVCFFilesOK = "";
-#    my $chromSiteVCFIndicesOK = "";
-#    for my $chrom (@CHROM)
-#    {
-#        $chromSiteVCFFiles .= " $finalVCFOutDir/$chrom.sites.vcf.gz";
-#        $chromSiteVCFFilesOK .= " $finalVCFOutDir/$chrom.sites.vcf.gz.OK";
-#        $chromSiteVCFIndicesOK .= " $finalVCFOutDir/$chrom.sites.vcf.gz.tbi.OK";
-#
-#        my $inputChromosomeIntervalVCFFiles = "";
-#        for my $interval (@{$intervalsByChrom{$chrom}})
-#        {
-#            $inputChromosomeIntervalVCFFiles .= " $vcfOutDir/$interval.vcf.gz";
-#        }
-#
-#        #genotypes VCFs
-#        $outputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
-#        $tgt = "$outputVCFFile.OK";
-#        $dep = "$logDir/end.calling.OK";
-#        @cmd = ("$vt concat $inputChromosomeIntervalVCFFiles -o + | $vt normalize + -o + -r $refGenomeFASTAFile 2> $statsDir/$chrom.normalize.log | $vt mergedups + -o $outputVCFFile 2> $statsDir/$chrom.mergedups.log");
-#        makeStep($tgt, $dep, @cmd);
-#
-#        $inputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
-#        $tgt = "$inputVCFFile.tbi.OK";
-#        $dep = "$inputVCFFile.OK";
-#        @cmd = ("$vt index $inputVCFFile");
-#        makeStep($tgt, $dep, @cmd);
-#
-#        #sites VCFs
-#        $inputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
-#        $outputVCFFile = "$finalVCFOutDir/$chrom.sites.vcf.gz";
-#        $tgt = "$outputVCFFile.OK";
-#        $dep = "$inputVCFFile.OK";
-#        @cmd = ("$vt view -s $inputVCFFile -o $outputVCFFile");
-#        makeStep($tgt, $dep, @cmd);
-#
-#        $inputVCFFile = "$finalVCFOutDir/$chrom.sites.vcf.gz";
-#        $tgt = "$inputVCFFile.tbi.OK";
-#        $dep = "$inputVCFFile.OK";
-#        @cmd = ("$vt index $inputVCFFile");
-#        makeStep($tgt, $dep, @cmd);
-#    }
-#
-#    $outputVCFFile = "$finalVCFOutDir/all.sites.vcf.gz";
-#    $tgt = "$outputVCFFile.OK";
-#    $dep = "$chromSiteVCFFilesOK";
-#    @cmd = ("$vt concat $chromSiteVCFFiles -o $outputVCFFile");
-#    makeStep($tgt, $dep, @cmd);
-#
-#    $inputVCFFile = "$finalVCFOutDir/all.sites.vcf.gz";
-#    $tgt = "$inputVCFFile.tbi.OK";
-#    $dep = "$inputVCFFile.OK";
-#    @cmd = ("$vt index $inputVCFFile");
-#    makeStep($tgt, $dep, @cmd);
-#
-#    #************
-#    #log end time
-#    #************
-#    $tgt = "$logDir/end.concatenating.normalizing.OK";
-#    $dep = "$chromSiteVCFIndicesOK";
-#    @cmd = ("date | awk '{print \"end concatenating and normalizing: \"\$\$0}' >> $logFile");
-#    makeLocalStep($tgt, $dep, @cmd);
-#}
-#else
-#{
-#    #**********************************
-#    #log start time for normalizing VCF
-#    #**********************************
-#    $tgt = "$logDir/start.normalization.OK";
-#    $dep = "$logDir/end.calling.OK";
-#    @cmd = ("date | awk '{print \"start normalization: \"\$\$0}' >> $logFile");
-#    makeLocalStep($tgt, $dep, @cmd);
-#
-#    $inputVCFFile = "$vcfOutDir/all.vcf";
-#    $outputVCFFile = "$finalVCFOutDir/all.genotypes.vcf.gz";
-#    $tgt = "$outputVCFFile.OK";
-#    $dep = "$logDir/end.genotyping.OK";
-#    @cmd = ("$vt normalize -r $refGenomeFASTAFile $inputVCFFile -o + | $vt mergedups + -o $outputVCFFile ");
-#    makeStep($tgt, $dep, @cmd);
-#
-#    $inputVCFFile = "$finalVCFOutDir/all.genotypes.vcf.gz";
-#    $tgt = "$inputVCFFile.tbi.OK";
-#    $dep = "$inputVCFFile.OK";
-#    @cmd = ("$vt index $inputVCFFile");
-#    makeStep($tgt, $dep, @cmd);
-#
-#    $inputVCFFile = "$finalVCFOutDir/all.genotypes.vcf.gz";
-#    $outputVCFFile = "$finalVCFOutDir/all.sites.vcf.gz";
-#    $tgt = "$outputVCFFile.OK";
-#    $dep = "$inputVCFFile.OK";
-#    @cmd = ("$vt view -s $inputVCFFile -o $outputVCFFile");
-#    makeStep($tgt, $dep, @cmd);
-#
-#    $inputVCFFile = "$finalVCFOutDir/all.sites.vcf.gz";
-#    $tgt = "$inputVCFFile.tbi.OK";
-#    $dep = "$inputVCFFile.OK";
-#    @cmd = ("$vt index $inputVCFFile");
-#    makeStep($tgt, $dep, @cmd);
-#
-#    #********************************
-#    #log end time for normalizing VCF
-#    #********************************
-#    $tgt = "$logDir/end.normalization.OK";
-#    $dep = "$inputVCFFile.tbi.OK";
-#    @cmd = ("date | awk '{print \"end normalization: \"\$\$0}' >> $logFile");
-#    makeLocalStep($tgt, $dep, @cmd);
-#}
+
+#*****************************
+#log end time for allelotyping
+#*****************************
+$tgt = "$logDir/end.allelotyping.OK";
+$dep = "$bamFilesOK";
+@cmd = ("date | awk '{print \"end: \"\$\$0}' >> $logFile");
+makeLocalStep($tgt, $dep, @cmd);
 
 #*******************
 #Write out make file
@@ -463,7 +348,7 @@ print MAK "all: @tgts\n\n";
 #clean
 push(@tgts, "clean");
 push(@deps, "");
-push(@cmds, "\t-rm -rf $outputDir/*.* $vcfOutDir/*.* $vcfOutDir/*/*.* $finalVCFOutDir/*.* $statsDir/* $logDir/* $outputDir/intervals/*.*");
+push(@cmds, "\t-rm -rf $outputDir/*.* $vcfOutDir/*.* $vcfOutDir/*/*.* $finalDir/*.* $statsDir/* $logDir/* $outputDir/intervals/*.*");
 
 for(my $i=0; $i < @tgts; ++$i) {
     print MAK "$tgts[$i] : $deps[$i]\n";
