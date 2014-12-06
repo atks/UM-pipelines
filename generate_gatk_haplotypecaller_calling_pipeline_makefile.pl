@@ -103,6 +103,8 @@ my $finalVCFOutDir = "$outputDir/final";
 mkpath($finalVCFOutDir);
 my $logDir = "$outputDir/log";
 mkpath($logDir);
+my $auxDir = "$outputDir/aux";
+mkpath($auxDir);
 my $logFile = "$outputDir/run.log";
 
 ########################################
@@ -124,6 +126,11 @@ while (<SA>)
     }
 }
 close(SA);
+
+my $bamListFile = "$auxDir/bam.list";
+open(OUT,">$bamListFile") || die "Cannot open $bamListFile\n";
+print OUT $bamFiles;
+close(OUT);
 
 print "read in " . scalar(keys(%SAMPLE)) . " samples\n";
 
@@ -246,7 +253,7 @@ if ($intervalWidth!=0)
                     "-o $outputVCFFile");
             makeStep($tgt, $dep, @cmd);
 
-            $GVCFFilesByInterval{$interval} .= " --variant $outputVCFFile";
+            $GVCFFilesByInterval{$interval} .= "$outputVCFFile\n";
             $GVCFFilesOK .= " $outputVCFFile.OK";
         }
     }
@@ -263,7 +270,7 @@ else
                 "-o $outputVCFFile");
         makeStep($tgt, $dep, @cmd);
 
-        $GVCFFiles .= " --variant $outputVCFFile";
+        $GVCFFiles .= "$outputVCFFile\n";
         $GVCFFilesOK .= " $outputVCFFile.OK";
     }
 }
@@ -294,10 +301,15 @@ if ($intervalWidth!=0)
 {
     for my $interval (@intervals)
     {
+        my $gvcfListFile = "$auxDir/$interval.gvcf.list";
+        open(OUT,">$gvcfListFile") || die "Cannot open $gvcfListFile\n";
+        print OUT $GVCFFilesByInterval{$interval};
+        close(OUT);
+        
         $outputVCFFile = "$vcfOutDir/$interval.vcf";
         $tgt = "$outputVCFFile.OK";
         $dep = "$logDir/start.combining_gvcfs.OK";;
-        @cmd = ("$gatk -T CombineGVCFs -R $refGenomeFASTAFile $GVCFFilesByInterval{$interval} -o $outputVCFFile");
+        @cmd = ("$gatk -T CombineGVCFs -R $refGenomeFASTAFile -V $gvcfListFile -o $outputVCFFile");
         makeStep($tgt, $dep, @cmd);
 
         $mergedVCFFilesOK .= " $outputVCFFile.OK";
@@ -305,10 +317,15 @@ if ($intervalWidth!=0)
 }
 else
 {
+    my $gvcfListFile = "$auxDir/gvcf.list";
+    open(OUT,">$gvcfListFile") || die "Cannot open $gvcfListFile\n";
+    print OUT $GVCFFiles;
+    close(OUT);
+    
     $outputVCFFile = "$vcfOutDir/all.vcf";
     $tgt = "$outputVCFFile.OK";
     $dep = "$logDir/start.combining_gvcfs.OK";;
-    @cmd = ("$gatk -T CombineGVCFs -R $refGenomeFASTAFile $GVCFFiles -o $outputVCFFile");
+    @cmd = ("$gatk -T CombineGVCFs -R $refGenomeFASTAFile -V $gvcfListFile -o $outputVCFFile");
     makeStep($tgt, $dep, @cmd);
 
     $mergedVCFFilesOK = "$outputVCFFile.OK";
