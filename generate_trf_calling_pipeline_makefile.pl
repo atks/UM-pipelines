@@ -142,7 +142,7 @@ my $mismatch = 7;
 my $delta = 7;
 my $pm = 80;
 my $pi = 10;
-my $minScore = 50;
+my $minScore = 14;
 my $maxPeriod = 500;
 
 #trf File Match Mismatch Delta PM PI Minscore MaxPeriod [options]
@@ -163,34 +163,38 @@ my $maxPeriod = 500;
 #               -r    no redundancy elimination
 #               -ngs  more compact .dat output on multisequence files, returns 0 on success. You may pipe input in with this option using - for file name. Short 50 flanks are appended to .dat output. See more information on TRF Unix Help web page.
 
-
 #Call STRs with TRF
+my $chromDatFiles = "";
+my $chromDatFilesOK = "";
 for my $chrom (@CHROMS)
 {
     my $inputFASTAFile = "$fastaDir/$chrom.fa";
     my $outputDir = "$auxDir";
     
-    $tgt = "$auxDir/$chrom.OK";
+    my $chromDatFile = "$auxDir/$chrom.fa.$matchWeight.$mismatch.$delta.$pm.$pi.$minScore.$maxPeriod.dat";
+    $tgt = "$chromDatFile.OK";
     $dep = "$fastaDir/all.OK";
     @cmd = ("cd $outputDir; $trf $inputFASTAFile $matchWeight $mismatch $delta $pm $pi $minScore $maxPeriod -f -d -h 2> $auxDir/$chrom.log > /dev/null; echo done > /dev/null");
     makeStep($tgt, $dep, @cmd);   
+
+    $chromDatFiles .= " $chromDatFile";
+    $chromDatFilesOK .= " $chromDatFile.OK";
 }
+
+#Concatenate into VCF file
+my $outputVCFFile = "$finalDir/all.sites.vcf.gz";
+$tgt = "$outputVCFFile.OK";
+$dep = $chromDatFilesOK;
+@cmd = ("$trfScriptsDir/cat_trf_dat_files $chromDatFiles -o $outputVCFFile");
+makeStep($tgt, $dep, @cmd);   
 
 #**************************
 #log end time for discovery
 #**************************
-#$tgt = "$logDir/end.alignment.OK";
-#$dep = "$sampleBAMFileIndicesOK";
-#@cmd = ("date | awk '{print \"end: \"\$\$0}' >> $logFile");
-#makeLocalStep($tgt, $dep, @cmd);
-
-##*****************************
-##log end time for allelotyping
-##*****************************
-#$tgt = "$logDir/end.allelotyping.OK";
-#$dep = "$bamFilesOK";
-#@cmd = ("date | awk '{print \"end: \"\$\$0}' >> $logFile");
-#makeLocalStep($tgt, $dep, @cmd);
+$tgt = "$logDir/end.discovery.OK";
+$dep = "$outputVCFFile.OK";
+@cmd = ("date | awk '{print \"end: \"\$\$0}' >> $logFile");
+makeLocalStep($tgt, $dep, @cmd);
 
 #*******************
 #Write out make file
