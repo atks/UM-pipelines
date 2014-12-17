@@ -128,8 +128,6 @@ while (<SA>)
 }
 close(SA);
 
-print "\"$bamFiles\"";
-
 print "read in " . scalar(keys(%SAMPLE)) . " samples\n";
 
 ###################
@@ -296,7 +294,7 @@ if ($intervalWidth!=0)
         #genotypes VCFs
         $tgt = "$outputVCFFile.OK";
         $dep = "$logDir/end.calling.OK";
-        @cmd = ("$vt concat $inputChromosomeIntervalVCFFiles | $vt normalize -r $refGenomeFASTAFile - 2> $statsDir/$chrom.normalize.log | $vt mergedups - -o $outputVCFFile 2> $statsDir/$chrom.mergedups.log");
+        @cmd = ("$vt cat $inputChromosomeIntervalVCFFiles -o + | $vt normalize + -r $refGenomeFASTAFile - 2> $statsDir/$chrom.normalize.log | $vt mergedups - -o $outputVCFFile 2> $statsDir/$chrom.mergedups.log");
         makeStep($tgt, $dep, @cmd);
 
         $tgt = "$outputVCFFile.tbi.OK";
@@ -321,7 +319,7 @@ if ($intervalWidth!=0)
     $outputVCFFile = "$finalVCFOutDir/all.sites.vcf.gz";
     $tgt = "$outputVCFFile.OK";
     $dep = "$chromSiteVCFFilesOK";
-    @cmd = ("$vt concat $chromSiteVCFFiles -o $outputVCFFile");
+    @cmd = ("$vt cat $chromSiteVCFFiles -o $outputVCFFile");
     makeStep($tgt, $dep, @cmd);
 
     $inputVCFFile = "$finalVCFOutDir/all.sites.vcf.gz";

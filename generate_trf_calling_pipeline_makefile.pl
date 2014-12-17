@@ -182,11 +182,26 @@ for my $chrom (@CHROMS)
 }
 
 #Concatenate into VCF file
-my $outputVCFFile = "$finalDir/all.sites.vcf.gz";
+my $outputVCFFile = "$auxDir/all.sites.vcf.gz";
 $tgt = "$outputVCFFile.OK";
 $dep = $chromDatFilesOK;
 @cmd = ("$trfScriptsDir/cat_trf_dat_files $chromDatFiles -o $outputVCFFile");
 makeStep($tgt, $dep, @cmd);   
+
+#sort
+my $inputVCFFile = "$auxDir/all.sites.vcf.gz";
+$outputVCFFile = "$finalDir/all.sites.vcf.gz";
+$tgt = "$outputVCFFile.OK";
+$dep = "$inputVCFFile.OK";
+@cmd = ("$vt sort -m local -w 100000 $inputVCFFile -o $outputVCFFile");
+makeStep($tgt, $dep, @cmd);   
+
+#index
+$inputVCFFile = "$finalDir/all.sites.vcf.gz";
+$tgt = "$inputVCFFile.tbi.OK";
+$dep = "$inputVCFFile.OK";
+@cmd = ("$vt index $inputVCFFile");
+makeStep($tgt, $dep, @cmd);  
 
 #**************************
 #log end time for discovery
