@@ -186,7 +186,7 @@ while (<SQ>)
                     close(INTERVAL);
                 }
             }
-            else
+            elsif ($i*$intervalWidth!=$len)
             {
                 $interval = $chrom . "_" . ($intervalWidth*$i+1) . "_" . $len;
                 $file = "$outputDir/intervals/$interval.interval_list";
@@ -197,7 +197,11 @@ while (<SQ>)
                     close(INTERVAL);
                 }
             }
-
+            else
+            {
+                last;
+            }
+            
             push(@{$intervalsByChrom{$chrom}}, "$interval");
             push(@intervals, $interval);
             push(@intervalFiles, $file);

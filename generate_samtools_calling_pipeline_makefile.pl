@@ -164,12 +164,16 @@ while (<SQ>)
                 $interval = $chrom . ":" . ($intervalWidth*$i+1) . "-" . ($intervalWidth*($i+1));
                 $intervalName = $chrom . "_" . ($intervalWidth*$i+1) . "_" . ($intervalWidth*($i+1));
             }
-            else
+            elsif ($i*$intervalWidth!=$len)
             {
                 $interval = $chrom . ":" . ($intervalWidth*$i+1) . "-" . $len;
                 $intervalName = $chrom . "_" . ($intervalWidth*$i+1) . "_" . $len;
             }
-
+            else
+            {
+                last;
+            }
+            
             push(@{$intervalsByChrom{$chrom}}, "$intervalName");
             push(@intervals, $interval);
             push(@intervalNames, $intervalName);

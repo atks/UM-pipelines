@@ -181,7 +181,7 @@ if ($intervalWidth!=0)
                         close(INTERVAL);
                     }
                 }
-                else
+                elsif ($i*$intervalWidth!=$len)
                 {
                     $interval = $chrom . "_" . ($intervalWidth*$i+1) . "_" . $len;
                     $file = "$outputDir/intervals/$interval.interval_list";
@@ -191,6 +191,10 @@ if ($intervalWidth!=0)
                         print INTERVAL "$chrom:" . ($intervalWidth*$i+1) . "-" . $len . "\n";
                         close(INTERVAL);
                     }
+                }
+                else
+                {
+                    last;
                 }
 
                 push(@{$intervalsByChrom{$chrom}}, "$interval");
@@ -373,7 +377,7 @@ else
     $outputVCFFile = "$finalVCFOutDir/all.genotypes.vcf";
     $tgt = "$outputVCFFile.OK";
     $dep = "$inputVCFFile.OK";
-    @cmd = ("$gatk -T CombineGVCFs -R $refGenomeFASTAFile --variant $inputVCFFile -o $outputVCFFile");
+    @cmd = ("$gatk -T GenotypeGVCFs -R $refGenomeFASTAFile --variant $inputVCFFile -o $outputVCFFile");
     makeStep($tgt, $dep, @cmd);
 
     $genotypeVCFFilesOK = "$outputVCFFile.OK";
