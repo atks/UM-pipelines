@@ -103,6 +103,8 @@ my $finalVCFOutDir = "$outputDir/final";
 mkpath($finalVCFOutDir);
 my $statsDir = "$outputDir/stats";
 mkpath($statsDir);
+my $auxDir = "$outputDir/aux";
+mkpath($auxDir);
 my $logDir = "$outputDir/log";
 mkpath($logDir);
 my $logFile = "$outputDir/run.log";
@@ -289,16 +291,20 @@ if ($intervalWidth!=0)
         $chromSiteVCFFiles .= " $finalVCFOutDir/$chrom.sites.vcf.gz";
         $chromSiteVCFFilesOK .= " $finalVCFOutDir/$chrom.sites.vcf.gz.OK";
 
+        my $chromVCFFileListFile = "$auxDir/$chrom.list";
+        open(OUT, ">$chromVCFFileListFile") || die "Cannot open $chromVCFFileListFile";
         for my $interval (@{$intervalsByChrom{$chrom}})
         {
+            print OUT "$vcfOutDir/$interval.vcf\n";
             $inputChromosomeIntervalVCFFiles .= " $vcfOutDir/$interval.vcf";
             $inputChromosomeIntervalVCFFileHdrsOK .= " $vcfOutDir/$interval.vcf.hdr.OK";
         }
+        close(OUT);
 
         #genotypes VCFs
         $tgt = "$outputVCFFile.OK";
         $dep = "$logDir/end.calling.OK";
-        @cmd = ("$vt cat $inputChromosomeIntervalVCFFiles -o + | $vt normalize + -r $refGenomeFASTAFile - 2> $statsDir/$chrom.normalize.log | $vt mergedups - -o $outputVCFFile 2> $statsDir/$chrom.mergedups.log");
+        @cmd = ("$vt cat -L $chromVCFFileListFile -o + | $vt normalize + -r $refGenomeFASTAFile - 2> $statsDir/$chrom.normalize.log | $vt mergedups - -o $outputVCFFile 2> $statsDir/$chrom.mergedups.log");
         makeStep($tgt, $dep, @cmd);
 
         $tgt = "$outputVCFFile.tbi.OK";
