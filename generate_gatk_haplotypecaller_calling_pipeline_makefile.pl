@@ -421,7 +421,7 @@ if ($intervalWidth!=0)
         $outputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
         $tgt = "$outputVCFFile.OK";
         $dep = "$inputGenotypeVCFFilesOK";
-        @cmd = ("$vt cat $inputGenotypeVCFFiles -o + | $vt normalize -r $refGenomeFASTAFile + -o + | $vt mergedups + -o $outputVCFFile ");
+        @cmd = ("$vt cat $inputGenotypeVCFFiles -o + | $vt normalize -r $refGenomeFASTAFile + -o + | $vt uniq + -o $outputVCFFile ");
         makeStep($tgt, $dep, @cmd);
 
         $tgt = "$outputVCFFile.tbi.OK";

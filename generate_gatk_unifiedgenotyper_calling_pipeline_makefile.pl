@@ -315,7 +315,7 @@ if ($intervalWidth!=0)
         $outputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
         $tgt = "$outputVCFFile.OK";
         $dep = "$logDir/end.calling.OK";
-        @cmd = ("$vt cat $inputChromosomeIntervalVCFFiles -o + | $vt normalize + -o + -r $refGenomeFASTAFile 2> $statsDir/$chrom.normalize.log | $vt mergedups + -o $outputVCFFile 2> $statsDir/$chrom.mergedups.log");
+        @cmd = ("$vt cat $inputChromosomeIntervalVCFFiles -o + | $vt normalize + -o + -r $refGenomeFASTAFile 2> $statsDir/$chrom.normalize.log | $vt uniq + -o $outputVCFFile 2> $statsDir/$chrom.uniq.log");
         makeStep($tgt, $dep, @cmd);
 
         $inputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
@@ -373,7 +373,7 @@ else
     $outputVCFFile = "$finalVCFOutDir/all.genotypes.vcf.gz";
     $tgt = "$outputVCFFile.OK";
     $dep = "$logDir/end.genotyping.OK";
-    @cmd = ("$vt normalize -r $refGenomeFASTAFile $inputVCFFile -o + | $vt mergedups + -o $outputVCFFile ");
+    @cmd = ("$vt normalize -r $refGenomeFASTAFile $inputVCFFile -o + | $vt uniq + -o $outputVCFFile ");
     makeStep($tgt, $dep, @cmd);
 
     $inputVCFFile = "$finalVCFOutDir/all.genotypes.vcf.gz";
