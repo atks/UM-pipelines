@@ -338,7 +338,7 @@ else
     $outputVCFFile = "$finalVCFOutDir/all.genotypes.vcf.gz";
     $tgt = "$outputVCFFile.OK";
     $dep = "$logDir/end.genotyping.OK";
-    @cmd = ("$vt normalize -r $refGenomeFASTAFile $inputVCFFile -o + | $vt mergedups + -o $outputVCFFile ");
+    @cmd = ("$vt normalize -r $refGenomeFASTAFile $inputVCFFile -o + 2> $statsDir/all.normalize.log | $vt uniq + -o $outputVCFFile 2> $statsDir/all.uniq.log");
     makeStep($tgt, $dep, @cmd);
 
     $inputVCFFile = "$finalVCFOutDir/all.genotypes.vcf.gz";
