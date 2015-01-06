@@ -105,6 +105,8 @@ my $logDir = "$outputDir/log";
 mkpath($logDir);
 my $auxDir = "$outputDir/aux";
 mkpath($auxDir);
+my $statsDir = "$outputDir/stats";
+mkpath($statsDir);
 my $logFile = "$outputDir/run.log";
 
 ########################################
