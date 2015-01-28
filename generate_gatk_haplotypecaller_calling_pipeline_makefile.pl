@@ -81,7 +81,7 @@ if(!GetOptions ('h'=>\$help,
 
 #programs
 #you can set the  maximum memory here to be whatever you want
-my $gatk = "/net/fantasia/home/atks/dev/vt/comparisons/programs/jdk1.7.0_25/bin/java -jar -Xmx$jvmMemory /net/fantasia/home/atks/dev/vt/comparisons/programs/GenomeAnalysisTK-3.1-1/GenomeAnalysisTK.jar";
+my $gatk = "/net/fantasia/home/atks/dev/vt/comparisons/programs/jdk1.7.0_25/bin/java -jar -Xmx$jvmMemory /net/fantasia/home/atks/dev/vt/comparisons/programs/GenomeAnalysisTK-3.3-0/GenomeAnalysisTK.jar";
 my $vt = "$vtDir/vt";
 
 printf("generate_gatk_haplotypecaller_pipeline_makefile.pl\n");
