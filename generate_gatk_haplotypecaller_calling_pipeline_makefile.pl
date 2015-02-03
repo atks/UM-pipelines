@@ -319,7 +319,7 @@ if ($intervalWidth!=0)
         open(OUT,">$gvcfListFile") || die "Cannot open $gvcfListFile\n";
         print OUT $GVCFFilesByInterval{$interval};
         close(OUT);
-        
+
         $outputVCFFile = "$vcfOutDir/$interval.vcf";
         $tgt = "$outputVCFFile.OK";
         $dep = "$logDir/start.combining_gvcfs.OK";;
@@ -335,7 +335,7 @@ else
     open(OUT,">$gvcfListFile") || die "Cannot open $gvcfListFile\n";
     print OUT $GVCFFiles;
     close(OUT);
-    
+
     $outputVCFFile = "$vcfOutDir/all.vcf";
     $tgt = "$outputVCFFile.OK";
     $dep = "$logDir/start.combining_gvcfs.OK";;
@@ -419,19 +419,22 @@ if ($intervalWidth!=0)
     for my $chrom (@CHROM)
     {
         my $inputGenotypeVCFFiles = "";
-        my $inputGenotypeVCFFilesOK = "";
         $chromGenotypeVCFFilesOK .= " $finalVCFOutDir/$chrom.genotypes.vcf.gz.OK";
 
         for my $interval (@{$intervalsByChrom{$chrom}})
         {
-            $inputGenotypeVCFFiles .= " $vcfOutDir/$interval.genotypes.vcf";
-            $inputGenotypeVCFFilesOK .= " $vcfOutDir/$interval.genotypes.vcf.OK";
+            $inputGenotypeVCFFiles .= "$vcfOutDir/$interval.genotypes.vcf\n";
         }
+
+        my $vcfListFile = "$auxDir/$chrom.vcf.list";
+        open(OUT,">$vcfListFile") || die "Cannot open $vcfListFile\n";
+        print OUT $inputGenotypeVCFFiles;
+        close(OUT);
 
         $outputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
         $tgt = "$outputVCFFile.OK";
-        $dep = "$inputGenotypeVCFFilesOK";
-        @cmd = ("$vt cat $inputGenotypeVCFFiles -o + | $vt normalize -r $refGenomeFASTAFile + -o + 2> $statsDir/$chrom.normalize.log | $vt uniq + -o $outputVCFFile 2> $statsDir/$chrom.uniq.log");
+        $dep = "$logDir/end.genotyping.OK";
+        @cmd = ("$vt cat -L $vcfListFile -o + | $vt normalize -r $refGenomeFASTAFile + -o + 2> $statsDir/$chrom.normalize.log | $vt uniq + -o $outputVCFFile 2> $statsDir/$chrom.uniq.log");
         makeStep($tgt, $dep, @cmd);
 
         $tgt = "$outputVCFFile.tbi.OK";
@@ -472,34 +475,27 @@ if ($intervalWidth!=0)
     {
         for my $chrom (@CHROM)
         {
-            my $inputGenotypeVCFFiles = "";
-            my $inputGenotypeVCFFilesOK = "";
+            my $vcfListFile = "$auxDir/$chrom.vcf.list";
             $chromGenotypeVCFFilesOK .= " $rawCopyDir/$chrom.genotypes.vcf.gz.OK";
-    
-            for my $interval (@{$intervalsByChrom{$chrom}})
-            {
-                $inputGenotypeVCFFiles .= " $vcfOutDir/$interval.genotypes.vcf";
-                $inputGenotypeVCFFilesOK .= " $vcfOutDir/$interval.genotypes.vcf.OK";
-            }
-    
+
             $outputVCFFile = "$rawCopyDir/$chrom.genotypes.vcf.gz";
             $tgt = "$outputVCFFile.OK";
-            $dep = "$inputGenotypeVCFFilesOK";
-            @cmd = ("$vt cat $inputGenotypeVCFFiles -o + | $vt uniq + -o $outputVCFFile 2> $statsDir/$chrom.raw.uniq.log");
+            $dep = "$logDir/end.genotyping.OK";
+            @cmd = ("$vt cat -L $vcfListFile -o + | $vt uniq + -o $outputVCFFile 2> $statsDir/$chrom.raw.uniq.log");
             makeStep($tgt, $dep, @cmd);
-    
+
             $tgt = "$outputVCFFile.tbi.OK";
             $dep = "$outputVCFFile.OK";
             @cmd = ("$vt index $outputVCFFile");
             makeStep($tgt, $dep, @cmd);
-    
+
             $inputVCFFile = "$rawCopyDir/$chrom.genotypes.vcf.gz";
             $outputVCFFile = "$rawCopyDir/$chrom.sites.vcf.gz";
             $tgt = "$outputVCFFile.OK";
             $dep = "$inputVCFFile.OK";
             @cmd = ("$vt view -s $inputVCFFile -o $outputVCFFile");
             makeStep($tgt, $dep, @cmd);
-    
+
             $inputVCFFile = "$rawCopyDir/$chrom.sites.vcf.gz";
             $outputVCFFile = "$rawCopyDir/$chrom.sites.vcf.gz.tbi";
             $tgt = "$outputVCFFile.OK";
@@ -507,7 +503,7 @@ if ($intervalWidth!=0)
             @cmd = ("$vt index $inputVCFFile");
             makeStep($tgt, $dep, @cmd);
         }
-        
+
         my $inputVCFFiles = join(" ", map {"$rawCopyDir/$_.sites.vcf.gz"} @CHROM);
         my $inputVCFFilesOK = join(" ", map {"$rawCopyDir/$_.sites.vcf.gz.OK"} @CHROM);
         $outputVCFFile = "$rawCopyDir/all.sites.vcf.gz";
@@ -515,13 +511,13 @@ if ($intervalWidth!=0)
         $dep = "$inputVCFFilesOK";
         @cmd = ("$vt cat $inputVCFFiles -o $outputVCFFile");
         makeStep($tgt, $dep, @cmd);
-    
+
         $inputVCFFile = "$rawCopyDir/all.sites.vcf.gz";
         $tgt = "$inputVCFFile.tbi.OK";
         $dep = "$inputVCFFile.OK";
         @cmd = ("$vt index $inputVCFFile");
         makeStep($tgt, $dep, @cmd);
-    }    
+    }
 
     #***********************************************
     #log end time for concating and normalizing VCFs
