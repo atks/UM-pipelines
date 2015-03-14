@@ -97,7 +97,7 @@ printf("         sequence length file %s\n", $sequenceLengthFile);
 printf("         interval width       %s\n", $intervalWidth);
 printf("         reference            %s\n", $refGenomeFASTAFile);
 printf("         JVM Memory           %s\n", $jvmMemory);
-printf("         Raw Copy             %s\n", $rawCopy);
+printf("         raw Copy             %s\n", $rawCopy);
 printf("\n");
 
 my $vcfOutDir = "$outputDir/vcf";
@@ -110,12 +110,12 @@ my $auxDir = "$outputDir/aux";
 mkpath($auxDir);
 my $statsDir = "$outputDir/stats";
 mkpath($statsDir);
-my $logFile = "$outputDir/run.log";
 my $rawCopyDir = "$outputDir/raw";
 if ($rawCopy)
 {
     mkpath($rawCopyDir);
 }
+my $logFile = "$outputDir/run.log";
 
 ########################################
 #Read file locations and name of samples

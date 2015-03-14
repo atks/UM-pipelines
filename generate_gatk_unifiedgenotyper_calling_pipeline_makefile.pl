@@ -47,6 +47,7 @@ my $intervalWidth = 1000000;
 my $refGenomeFASTAFile = "";
 my $jvmMemory = "2g";
 my $variantType = "BOTH";
+my $rawCopy = 0;
 
 #initialize options
 Getopt::Long::Configure ('bundling');
@@ -64,7 +65,8 @@ if(!GetOptions ('h'=>\$help,
                 'i:s'=>\$intervalWidth,
                 'r:s'=>\$refGenomeFASTAFile,
                 'j:s'=>\$jvmMemory,
-                'v:s'=>\$variantType
+                'v:s'=>\$variantType,
+                'x'=>\$rawCopy
                 )
   || !defined($workDir)
   || !defined($makeFile)
@@ -101,6 +103,7 @@ printf("         interval width       %s\n", $intervalWidth);
 printf("         reference            %s\n", $refGenomeFASTAFile);
 printf("         JVM Memory           %s\n", $jvmMemory);
 printf("         variant types        %s\n", $variantType);
+printf("         raw Copy             %s\n", $rawCopy);
 printf("\n");
 
 my $vcfOutDir = "$outputDir/vcf";
@@ -113,6 +116,11 @@ my $logDir = "$outputDir/log";
 mkpath($logDir);
 my $auxDir = "$outputDir/aux";
 mkpath($auxDir);
+my $rawCopyDir = "$outputDir/raw";
+if ($rawCopy)
+{
+    mkpath($rawCopyDir);
+}
 my $logFile = "$outputDir/run.log";
 
 ########################################
@@ -351,6 +359,53 @@ if ($intervalWidth!=0)
     @cmd = ("$vt index $inputVCFFile");
     makeStep($tgt, $dep, @cmd);
 
+    if ($rawCopy)
+    {
+        for my $chrom (@CHROM)
+        {
+            my $vcfListFile = "$auxDir/$chrom.vcf.list";
+            $chromGenotypeVCFFilesOK .= " $rawCopyDir/$chrom.genotypes.vcf.gz.OK";
+
+            $outputVCFFile = "$rawCopyDir/$chrom.genotypes.vcf.gz";
+            $tgt = "$outputVCFFile.OK";
+            $dep = "$logDir/end.genotyping.OK";
+            @cmd = ("$vt cat -L $vcfListFile -o + | $vt uniq + -o $outputVCFFile 2> $statsDir/$chrom.raw.uniq.log");
+            makeStep($tgt, $dep, @cmd);
+
+            $tgt = "$outputVCFFile.tbi.OK";
+            $dep = "$outputVCFFile.OK";
+            @cmd = ("$vt index $outputVCFFile");
+            makeStep($tgt, $dep, @cmd);
+
+            $inputVCFFile = "$rawCopyDir/$chrom.genotypes.vcf.gz";
+            $outputVCFFile = "$rawCopyDir/$chrom.sites.vcf.gz";
+            $tgt = "$outputVCFFile.OK";
+            $dep = "$inputVCFFile.OK";
+            @cmd = ("$vt view -s $inputVCFFile -o $outputVCFFile");
+            makeStep($tgt, $dep, @cmd);
+
+            $inputVCFFile = "$rawCopyDir/$chrom.sites.vcf.gz";
+            $outputVCFFile = "$rawCopyDir/$chrom.sites.vcf.gz.tbi";
+            $tgt = "$outputVCFFile.OK";
+            $dep = "$inputVCFFile.OK";
+            @cmd = ("$vt index $inputVCFFile");
+            makeStep($tgt, $dep, @cmd);
+        }
+
+        my $inputVCFFiles = join(" ", map {"$rawCopyDir/$_.sites.vcf.gz"} @CHROM);
+        my $inputVCFFilesOK = join(" ", map {"$rawCopyDir/$_.sites.vcf.gz.OK"} @CHROM);
+        $outputVCFFile = "$rawCopyDir/all.sites.vcf.gz";
+        $tgt = "$outputVCFFile.OK";
+        $dep = "$inputVCFFilesOK";
+        @cmd = ("$vt cat $inputVCFFiles -o $outputVCFFile");
+        makeStep($tgt, $dep, @cmd);
+
+        $inputVCFFile = "$rawCopyDir/all.sites.vcf.gz";
+        $tgt = "$inputVCFFile.tbi.OK";
+        $dep = "$inputVCFFile.OK";
+        @cmd = ("$vt index $inputVCFFile");
+        makeStep($tgt, $dep, @cmd);
+    }
     #************
     #log end time
     #************
