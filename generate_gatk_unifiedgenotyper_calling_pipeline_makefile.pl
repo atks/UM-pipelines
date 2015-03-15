@@ -85,7 +85,7 @@ if(!GetOptions ('h'=>\$help,
 
 #programs
 #you can set the  maximum memory here to be whatever you want
-my $gatk = "/net/fantasia/home/atks/dev/vt/comparisons/programs/jdk1.7.0_25/bin/java -jar -Xmx$jvmMemory /net/fantasia/home/atks/dev/vt/comparisons/programs/GenomeAnalysisTK-3.1-1/GenomeAnalysisTK.jar";
+my $gatk = "/net/fantasia/home/atks/dev/vt/comparisons/programs/jdk1.7.0_25/bin/java -jar -Xmx$jvmMemory /net/fantasia/home/atks/dev/vt/comparisons/programs/GenomeAnalysisTK-3.3-0/GenomeAnalysisTK.jar";
 my $vt = "$vtDir/vt";
 
 printf("generate_gatk_unifiedgenotyper_calling_pipeline_makefile.pl\n");
@@ -359,13 +359,29 @@ if ($intervalWidth!=0)
     @cmd = ("$vt index $inputVCFFile");
     makeStep($tgt, $dep, @cmd);
 
+    #************
+    #log end time
+    #************
+    $tgt = "$logDir/end.concatenating.normalizing.OK";
+    $dep = "$chromSiteVCFIndicesOK";
+    @cmd = ("date | awk '{print \"end concatenating and normalizing: \"\$\$0}' >> $logFile");
+    makeLocalStep($tgt, $dep, @cmd);
+    
     if ($rawCopy)
     {
         for my $chrom (@CHROM)
         {
+            my $inputGenotypeVCFFiles = "";
+            for my $interval (@{$intervalsByChrom{$chrom}})
+            {
+                $inputGenotypeVCFFiles .= "$vcfOutDir/$interval.genotypes.vcf\n";
+            }
+    
             my $vcfListFile = "$auxDir/$chrom.vcf.list";
-            $chromGenotypeVCFFilesOK .= " $rawCopyDir/$chrom.genotypes.vcf.gz.OK";
-
+            open(OUT,">$vcfListFile") || die "Cannot open $vcfListFile\n";
+            print OUT $inputGenotypeVCFFiles;
+            close(OUT);
+            
             $outputVCFFile = "$rawCopyDir/$chrom.genotypes.vcf.gz";
             $tgt = "$outputVCFFile.OK";
             $dep = "$logDir/end.genotyping.OK";
@@ -406,13 +422,6 @@ if ($intervalWidth!=0)
         @cmd = ("$vt index $inputVCFFile");
         makeStep($tgt, $dep, @cmd);
     }
-    #************
-    #log end time
-    #************
-    $tgt = "$logDir/end.concatenating.normalizing.OK";
-    $dep = "$chromSiteVCFIndicesOK";
-    @cmd = ("date | awk '{print \"end concatenating and normalizing: \"\$\$0}' >> $logFile");
-    makeLocalStep($tgt, $dep, @cmd);
 }
 else
 {

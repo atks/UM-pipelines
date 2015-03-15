@@ -345,7 +345,15 @@ if ($intervalWidth!=0)
     $dep = "$inputVCFFile.OK";
     @cmd = ("$vt index $inputVCFFile");
     makeStep($tgt, $dep, @cmd);
-    
+   
+    #***************************************************
+    #log end time for concatenating and normalizing VCFs
+    #***************************************************
+    $tgt = "$logDir/end.concatenation.normalization.OK";
+    $dep = "$finalVCFOutDir/all.sites.vcf.gz.tbi.OK";
+    @cmd = ("date | awk '{print \"end concat and normalize: \"\$\$0}' >> $logFile");
+    makeLocalStep($tgt, $dep, @cmd);
+     
     if ($rawCopy)
     {
         for my $chrom (@CHROM)
@@ -400,14 +408,6 @@ if ($intervalWidth!=0)
         @cmd = ("$vt index $inputVCFFile");
         makeStep($tgt, $dep, @cmd);
     }
-    
-    #***************************************************
-    #log end time for concatenating and normalizing VCFs
-    #***************************************************
-    $tgt = "$logDir/end.concatenation.normalization.OK";
-    $dep = "$finalVCFOutDir/all.sites.vcf.gz.tbi.OK";
-    @cmd = ("date | awk '{print \"end concat and normalize: \"\$\$0}' >> $logFile");
-    makeLocalStep($tgt, $dep, @cmd);
 }
 else
 {

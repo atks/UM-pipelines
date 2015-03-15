@@ -44,6 +44,7 @@ my $sequenceLengthFile;
 my $intervalWidth = 1000000;
 my $refGenomeFASTAFile;
 my $variantType;
+my $rawCopy;
 
 #initialize options
 Getopt::Long::Configure ('bundling');
@@ -58,7 +59,8 @@ if(!GetOptions ('h'=>\$help,
                 's:s'=>\$sampleFile,
                 'l:s'=>\$sequenceLengthFile,
                 'i:s'=>\$intervalWidth,
-                'r:s'=>\$refGenomeFASTAFile
+                'r:s'=>\$refGenomeFASTAFile,
+                'x'=>\$rawCopy
                 )
   || !defined($makeFile)
   || !defined($sampleFile)
@@ -92,6 +94,7 @@ printf("         sample file          %s\n", $sampleFile);
 printf("         sequence length file %s\n", $sequenceLengthFile);
 printf("         interval width       %s\n", $intervalWidth);
 printf("         reference            %s\n", $refGenomeFASTAFile);
+printf("         raw copy             %s\n", $rawCopy);
 printf("\n");
 
 my $vcfOutDir = "$outputDir/vcf";
