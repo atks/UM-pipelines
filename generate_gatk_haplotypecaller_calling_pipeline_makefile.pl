@@ -418,23 +418,18 @@ if ($intervalWidth!=0)
 
     for my $chrom (@CHROM)
     {
-        my $inputGenotypeVCFFiles = "";
-        $chromGenotypeVCFFilesOK .= " $finalVCFOutDir/$chrom.genotypes.vcf.gz.OK";
-
-        for my $interval (@{$intervalsByChrom{$chrom}})
-        {
-            $inputGenotypeVCFFiles .= "$vcfOutDir/$interval.genotypes.vcf\n";
-        }
-
         my $vcfListFile = "$auxDir/$chrom.vcf.list";
         open(OUT,">$vcfListFile") || die "Cannot open $vcfListFile\n";
-        print OUT $inputGenotypeVCFFiles;
+        for my $interval (@{$intervalsByChrom{$chrom}})
+        {
+            print OUT "$vcfOutDir/$interval.genotypes.vcf\n";
+        }
         close(OUT);
 
         $outputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
         $tgt = "$outputVCFFile.OK";
         $dep = "$logDir/end.genotyping.OK";
-        @cmd = ("$vt cat -L $vcfListFile -o + | $vt normalize -r $refGenomeFASTAFile + -o + 2> $statsDir/$chrom.normalize.log | $vt uniq + -o $outputVCFFile 2> $statsDir/$chrom.uniq.log");
+        @cmd = ("$vt cat -L $vcfListFile -o + -w 1000 | $vt normalize -r $refGenomeFASTAFile + -o + 2> $statsDir/$chrom.normalize.log | $vt uniq + -o $outputVCFFile 2> $statsDir/$chrom.uniq.log");
         makeStep($tgt, $dep, @cmd);
 
         $tgt = "$outputVCFFile.tbi.OK";
@@ -474,8 +469,9 @@ if ($intervalWidth!=0)
     #***********************************************
     #log end time for concating and normalizing VCFs
     #***********************************************
+    my $inputVCFFileIndicesOK = join(" ", map {"$finalVCFOutDir/$_.sites.vcf.gz.tbi.OK"} @CHROM);
     $tgt = "$logDir/end.concatenation.normalization.OK";
-    $dep = "$chromGenotypeVCFFilesOK";
+    $dep = "$inputVCFFileIndicesOK";
     @cmd = ("date | awk '{print \"end concatenation and normalization: \"\$\$0}' >> $logFile");
     makeLocalStep($tgt, $dep, @cmd);
     
@@ -484,12 +480,10 @@ if ($intervalWidth!=0)
         for my $chrom (@CHROM)
         {
             my $vcfListFile = "$auxDir/$chrom.vcf.list";
-            $chromGenotypeVCFFilesOK .= " $rawCopyDir/$chrom.genotypes.vcf.gz.OK";
-
             $outputVCFFile = "$rawCopyDir/$chrom.genotypes.vcf.gz";
             $tgt = "$outputVCFFile.OK";
-            $dep = "$logDir/end.genotyping.OK";
-            @cmd = ("$vt cat -L $vcfListFile -o + | $vt uniq + -o $outputVCFFile 2> $statsDir/$chrom.raw.uniq.log");
+            $dep = "$logDir/end.calling.OK";
+            @cmd = ("$vt cat -L $vcfListFile -o + -w 1000 | $vt uniq + -o $outputVCFFile 2> $statsDir/$chrom.raw.uniq.log");
             makeStep($tgt, $dep, @cmd);
 
             $tgt = "$outputVCFFile.tbi.OK";

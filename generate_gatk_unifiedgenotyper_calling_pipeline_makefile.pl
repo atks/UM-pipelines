@@ -256,7 +256,7 @@ if ($intervalWidth!=0)
         #nct - number of computing threads
         #interval_padding ensures that you capture Indels that lie across a boundary. Note that UnifiedGenotyper uses locuswalker.
         #--max_alternate_alleles is set at 6 by default
-        $outputVCFFile = "$vcfOutDir/$intervals[$i].vcf";
+        $outputVCFFile = "$vcfOutDir/$intervals[$i].genotypes.vcf";
         $tgt = "$outputVCFFile.OK";
         $dep = "";
         @cmd = ("$gatk -T UnifiedGenotyper -R $refGenomeFASTAFile -glm $variantType --interval_padding 100 -I $bamListFile --genotyping_mode DISCOVERY -o $outputVCFFile --output_mode EMIT_VARIANTS_ONLY -L $intervalFiles[$i]"),
@@ -309,21 +309,19 @@ if ($intervalWidth!=0)
     my $chromSiteVCFIndicesOK = "";
     for my $chrom (@CHROM)
     {
-        $chromSiteVCFFiles .= " $finalVCFOutDir/$chrom.sites.vcf.gz";
-        $chromSiteVCFFilesOK .= " $finalVCFOutDir/$chrom.sites.vcf.gz.OK";
-        $chromSiteVCFIndicesOK .= " $finalVCFOutDir/$chrom.sites.vcf.gz.tbi.OK";
-
-        my $inputChromosomeIntervalVCFFiles = "";
+        my $vcfListFile = "$auxDir/$chrom.vcf.list";
+        open(OUT,">$vcfListFile") || die "Cannot open $vcfListFile\n";
         for my $interval (@{$intervalsByChrom{$chrom}})
         {
-            $inputChromosomeIntervalVCFFiles .= " $vcfOutDir/$interval.vcf";
+            print OUT "$vcfOutDir/$interval.genotypes.vcf\n";
         }
-
+        close(OUT);
+        
         #genotypes VCFs
         $outputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
         $tgt = "$outputVCFFile.OK";
         $dep = "$logDir/end.calling.OK";
-        @cmd = ("$vt cat $inputChromosomeIntervalVCFFiles -o + | $vt normalize + -o + -r $refGenomeFASTAFile 2> $statsDir/$chrom.normalize.log | $vt uniq + -o $outputVCFFile 2> $statsDir/$chrom.uniq.log");
+        @cmd = ("$vt cat -L $vcfListFile -o + -w 1000 | $vt normalize + -o + -r $refGenomeFASTAFile 2> $statsDir/$chrom.normalize.log | $vt uniq + -o $outputVCFFile 2> $statsDir/$chrom.uniq.log");
         makeStep($tgt, $dep, @cmd);
 
         $inputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
@@ -347,10 +345,12 @@ if ($intervalWidth!=0)
         makeStep($tgt, $dep, @cmd);
     }
 
+    my $inputVCFFiles = join(" ", map {"$finalVCFOutDir/$_.sites.vcf.gz"} @CHROM);
+    my $inputVCFFilesOK = join(" ", map {"$finalVCFOutDir/$_.sites.vcf.gz.OK"} @CHROM);
     $outputVCFFile = "$finalVCFOutDir/all.sites.vcf.gz";
     $tgt = "$outputVCFFile.OK";
-    $dep = "$chromSiteVCFFilesOK";
-    @cmd = ("$vt cat $chromSiteVCFFiles -o $outputVCFFile");
+    $dep = "$inputVCFFilesOK";
+    @cmd = ("$vt cat $inputVCFFiles -o $outputVCFFile");
     makeStep($tgt, $dep, @cmd);
 
     $inputVCFFile = "$finalVCFOutDir/all.sites.vcf.gz";
@@ -362,8 +362,9 @@ if ($intervalWidth!=0)
     #************
     #log end time
     #************
+    my $inputVCFFileIndicesOK = join(" ", map {"$finalVCFOutDir/$_.sites.vcf.gz.tbi.OK"} @CHROM);
     $tgt = "$logDir/end.concatenating.normalizing.OK";
-    $dep = "$chromSiteVCFIndicesOK";
+    $dep = $inputVCFFileIndicesOK;
     @cmd = ("date | awk '{print \"end concatenating and normalizing: \"\$\$0}' >> $logFile");
     makeLocalStep($tgt, $dep, @cmd);
     
@@ -371,21 +372,11 @@ if ($intervalWidth!=0)
     {
         for my $chrom (@CHROM)
         {
-            my $inputGenotypeVCFFiles = "";
-            for my $interval (@{$intervalsByChrom{$chrom}})
-            {
-                $inputGenotypeVCFFiles .= "$vcfOutDir/$interval.genotypes.vcf\n";
-            }
-    
             my $vcfListFile = "$auxDir/$chrom.vcf.list";
-            open(OUT,">$vcfListFile") || die "Cannot open $vcfListFile\n";
-            print OUT $inputGenotypeVCFFiles;
-            close(OUT);
-            
             $outputVCFFile = "$rawCopyDir/$chrom.genotypes.vcf.gz";
             $tgt = "$outputVCFFile.OK";
-            $dep = "$logDir/end.genotyping.OK";
-            @cmd = ("$vt cat -L $vcfListFile -o + | $vt uniq + -o $outputVCFFile 2> $statsDir/$chrom.raw.uniq.log");
+            $dep = "$logDir/end.calling.OK";
+            @cmd = ("$vt cat -L $vcfListFile -o + -w 1000 | $vt uniq + -o $outputVCFFile 2> $statsDir/$chrom.raw.uniq.log");
             makeStep($tgt, $dep, @cmd);
 
             $tgt = "$outputVCFFile.tbi.OK";
