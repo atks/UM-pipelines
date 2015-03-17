@@ -269,16 +269,13 @@ if ($intervalWidth!=0)
     @cmd = ("date | awk '{print \"start concatenating and normalizing: \"\$\$0}' >> $logFile");
     makeLocalStep($tgt, $dep, @cmd);
 
-    my $chromSiteVCFFiles = "";
-    my $chromSiteVCFFilesOK = "";
-    my $chromSiteVCFIndicesOK = "";
     for my $chrom (@CHROM)
     {
         my $vcfListFile = "$auxDir/$chrom.vcf.list";
         open(OUT,">$vcfListFile") || die "Cannot open $vcfListFile\n";
         for my $interval (@{$intervalsByChrom{$chrom}})
         {
-            print OUT "$vcfOutDir/$interval.genotypes.vcf\n";
+            print OUT "$vcfOutDir/$interval.genotypes.vcf.gz\n";
         }
         close(OUT);
         
@@ -309,11 +306,13 @@ if ($intervalWidth!=0)
         @cmd = ("$vt index $inputVCFFile");
         makeStep($tgt, $dep, @cmd);
     }
-
+    
+    my $inputVCFFiles = join(" ", map {"$finalVCFOutDir/$_.sites.vcf.gz"} @CHROM);
+    my $inputVCFFilesOK = join(" ", map {"$finalVCFOutDir/$_.sites.vcf.gz.OK"} @CHROM);
     $outputVCFFile = "$finalVCFOutDir/all.sites.vcf.gz";
     $tgt = "$outputVCFFile.OK";
-    $dep = "$chromSiteVCFFilesOK";
-    @cmd = ("$vt cat $chromSiteVCFFiles -o $outputVCFFile");
+    $dep = $inputVCFFilesOK;
+    @cmd = ("$vt cat $inputVCFFiles -o $outputVCFFile");
     makeStep($tgt, $dep, @cmd);
 
     $inputVCFFile = "$finalVCFOutDir/all.sites.vcf.gz";
@@ -326,7 +325,7 @@ if ($intervalWidth!=0)
     #log end time
     #************
     $tgt = "$logDir/end.concatenating.normalizing.OK";
-    $dep = "$chromSiteVCFIndicesOK";
+    $dep = "$inputVCFFile.tbi.OK";
     @cmd = ("date | awk '{print \"end concatenating and normalizing: \"\$\$0}' >> $logFile");
     makeLocalStep($tgt, $dep, @cmd);
 

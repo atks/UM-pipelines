@@ -220,7 +220,7 @@ makeLocalStep($tgt, $dep, @cmd);
 
 my $intervalVCFFiles = "";
 my $intervalVCFFileHdrsOK = "";
-my $contigsFile = "/net/fantasia/home/atks/dev/vt/comparisons/na12878/contigs.txt";
+my $contigsFile = "/net/fantasia/home/atks/dev/vt/comparisons/NA12878/indices/contigs.txt";
 
 if ($intervalWidth!=0)
 {
@@ -297,6 +297,7 @@ if ($intervalWidth!=0)
         close(OUT);
         
         #genotypes VCFs
+        $outputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
         $tgt = "$outputVCFFile.OK";
         $dep = "$logDir/end.calling.OK";
         @cmd = ("$vt cat -L $vcfListFile -o + -w 1000 | $vt normalize + -r $refGenomeFASTAFile - 2> $statsDir/$chrom.normalize.log | $vt uniq - -o $outputVCFFile 2> $statsDir/$chrom.uniq.log");
@@ -402,7 +403,7 @@ else
     $inputVCFFile = "$vcfOutDir/all.vcf";
     $outputVCFFile = "$finalVCFOutDir/all.genotypes.vcf.gz";
     $tgt = "$outputVCFFile.OK";
-    $dep = "$logDir/end.genotyping.OK";
+    $dep = "$logDir/end.calling.OK";
     @cmd = ("$vt normalize -r $refGenomeFASTAFile $inputVCFFile -o + 2> $statsDir/all.normalize.log | $vt uniq + -o $outputVCFFile 2> $statsDir/all.uniq.log");
     makeStep($tgt, $dep, @cmd);
 

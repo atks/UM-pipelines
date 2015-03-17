@@ -428,7 +428,7 @@ if ($intervalWidth!=0)
 
         $outputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
         $tgt = "$outputVCFFile.OK";
-        $dep = "$logDir/end.genotyping.OK";
+        $dep = "$logDir/start.concatenation.normalization.OK";
         @cmd = ("$vt cat -L $vcfListFile -o + -w 1000 | $vt normalize -r $refGenomeFASTAFile + -o + 2> $statsDir/$chrom.normalize.log | $vt uniq + -o $outputVCFFile 2> $statsDir/$chrom.uniq.log");
         makeStep($tgt, $dep, @cmd);
 
@@ -482,7 +482,7 @@ if ($intervalWidth!=0)
             my $vcfListFile = "$auxDir/$chrom.vcf.list";
             $outputVCFFile = "$rawCopyDir/$chrom.genotypes.vcf.gz";
             $tgt = "$outputVCFFile.OK";
-            $dep = "$logDir/end.calling.OK";
+            $dep = "$logDir/start.concatenation.normalization.OK";
             @cmd = ("$vt cat -L $vcfListFile -o + -w 1000 | $vt uniq + -o $outputVCFFile 2> $statsDir/$chrom.raw.uniq.log");
             makeStep($tgt, $dep, @cmd);
 
@@ -534,7 +534,7 @@ else
     $inputVCFFile = "$vcfOutDir/all.vcf";
     $outputVCFFile = "$finalVCFOutDir/all.genotypes.vcf.gz";
     $tgt = "$outputVCFFile.OK";
-    $dep = "$inputVCFFile.OK";
+    $dep = "$logDir/start.normalization.OK";
     @cmd = ("$vt normalize -r $refGenomeFASTAFile $inputVCFFile -o + 2> $statsDir/all.normalize.log | $vt uniq + -o $outputVCFFile 2> $statsDir/all.uniq.log");
     makeStep($tgt, $dep, @cmd);
 

@@ -270,7 +270,7 @@ if ($intervalWidth!=0)
     #************
     $tgt = "$logDir/end.calling.OK";
     $dep = "$intervalVCFFilesOK";
-    @cmd = ("date | awk '{print \"end: \"\$\$0}' >> $logFile");
+    @cmd = ("date | awk '{print \"end calling: \"\$\$0}' >> $logFile");
     makeLocalStep($tgt, $dep, @cmd);
 }
 else
