@@ -32,8 +32,6 @@ This script generates the make file to discovery and genotype a set of individua
 =cut
 
 my $help;
-
-my $workDir = "";
 my $outputDir = "run";
 my $vtDir = "";
 my $clusterDir = "";
@@ -53,7 +51,6 @@ my $rawCopy = 0;
 Getopt::Long::Configure ('bundling');
 
 if(!GetOptions ('h'=>\$help,
-                'w:s'=>\$workDir,
                 'o:s'=>\$outputDir,
                 'b:s'=>\$vtDir,
                 't:s'=>\$clusterDir,
@@ -90,8 +87,7 @@ my $vt = "$vtDir/vt";
 
 printf("generate_gatk_unifiedgenotyper_calling_pipeline_makefile.pl\n");
 printf("\n");
-printf("options: work dir             %s\n", $workDir);
-printf("         out dir              %s\n", $outputDir);
+printf("options: output dir           %s\n", $outputDir);
 printf("         vt path              %s\n", $vt);
 printf("         cluster path         %s\n", $clusterDir);
 printf("         make file            %s\n", $makeFile);

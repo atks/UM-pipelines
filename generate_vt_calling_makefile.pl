@@ -39,7 +39,7 @@ my $vtDir = "/net/fantasia/home/atks/dev/vt";
 my $clusterDir = "/net/fantasia/home/atks/programs/cluster";
 my $ext = "bcf";
 my $makeFile = "Makefile";
-my $cluster = "mini";
+my $partition = "mini";
 my $sleep = 0;
 my $sampleFile = "";
 my $intervals = "";
@@ -59,7 +59,7 @@ if(!GetOptions ('h'=>\$help,
                 't:s'=>\$clusterDir,                
                 'e:s'=>\$ext,
                 'm:s'=>\$makeFile,
-                'c:s'=>\$cluster,
+                'p:s'=>\$partition,
                 'd:s'=>\$sleep,
                 's:s'=>\$sampleFile,
                 'v:s'=>\$variantTypes,
@@ -94,7 +94,7 @@ printf("         vt path         %s\n", $vtDir);
 printf("         cluster path    %s\n", $clusterDir);
 printf("         ext             %s\n", $ext);
 printf("         make file       %s\n", $makeFile);
-printf("         cluster         %s\n", $cluster);
+printf("         partition       %s\n", $partition);
 printf("         sleep           %s\n", $sleep);
 printf("         sample file     %s\n", $sampleFile);
 printf("         variant types   %s\n", $variantTypes);
@@ -159,7 +159,7 @@ for my $sampleID (keys(%SAMPLE))
     #mine, left align and merge duplicate variants
     $tgt = "$sampleVCFFile.OK";
     $dep = "";
-    @cmd = "$vt discover -b $SAMPLE{$sampleID}{HC} -o + -v $variantTypes -r $refGenomeFASTAFile -s $sampleID $intervalsOption 2> $sampleDir/discover.log | $vt normalize + -r $refGenomeFASTAFile -o + 2> $sampleDir/normalize.log | $vt mergedups + -o $sampleVCFFile  2> $sampleDir/mergedups.log";
+    @cmd = "$vt discover2 -b $SAMPLE{$sampleID}{HC} -o + -v $variantTypes -r $refGenomeFASTAFile -s $sampleID $intervalsOption 2> $sampleDir/discover.log | $vt normalize + -r $refGenomeFASTAFile -o + 2> $sampleDir/normalize.log | $vt mergedups + -o $sampleVCFFile  2> $sampleDir/mergedups.log";
     makeStep($tgt, $dep, @cmd);
     
     #index
@@ -172,73 +172,73 @@ for my $sampleID (keys(%SAMPLE))
     $candidateSitesVCFOKFiles .= " $sampleVCFFile.$indexExt.OK";
 }
 
-#write candidate VCF files into a list
-my $candidateVCFFileList = "$auxDir/candidate_vcf_files.txt";
-open(IN, ">$candidateVCFFileList") ||die "Cannot open $candidateVCFFileList\n";
-my $temp = $candidateSitesVCFFiles;
-$temp =~ s/ /\n/g;
-$temp =~ s/^\s+//;
-print IN "$temp\n";
-close(IN);
-
-#merging and filtering of initial sites using likelhood ratio cut off of 2.
-my $candidateVCFFile = "$auxDir/all.sites.$ext";
-$tgt = "$candidateVCFFile.OK";
-$dep =  $candidateSitesVCFOKFiles;
-@cmd = ("$vt merge_candidate_variants -L $candidateVCFFileList -o $candidateVCFFile 2> $candidateVCFFile.log");
-makeStep($tgt, $dep, @cmd);
-
-#index candidate sites
-$tgt = "$candidateVCFFile.$indexExt.OK";
-$dep = "$candidateVCFFile.OK";
-@cmd = ("$vt index $candidateVCFFile 2> $candidateVCFFile.$indexExt.log");
-makeStep($tgt, $dep, @cmd);
+##write candidate VCF files into a list
+#my $candidateVCFFileList = "$auxDir/candidate_vcf_files.txt";
+#open(IN, ">$candidateVCFFileList") ||die "Cannot open $candidateVCFFileList\n";
+#my $temp = $candidateSitesVCFFiles;
+#$temp =~ s/ /\n/g;
+#$temp =~ s/^\s+//;
+#print IN "$temp\n";
+#close(IN);
+#
+##merging and filtering of initial sites using likelhood ratio cut off of 2.
+#my $candidateVCFFile = "$auxDir/all.sites.$ext";
+#$tgt = "$candidateVCFFile.OK";
+#$dep =  $candidateSitesVCFOKFiles;
+#@cmd = ("$vt merge_candidate_variants -L $candidateVCFFileList -o $candidateVCFFile 2> $candidateVCFFile.log");
+#makeStep($tgt, $dep, @cmd);
+#
+##index candidate sites
+#$tgt = "$candidateVCFFile.$indexExt.OK";
+#$dep = "$candidateVCFFile.OK";
+#@cmd = ("$vt index $candidateVCFFile 2> $candidateVCFFile.$indexExt.log");
+#makeStep($tgt, $dep, @cmd);
 
 ###############
 ##2. Genotyping
 ###############
 
-#construct probes for candidate sites
-my $probesVCFFile = "$auxDir/probes.sites.$ext";
-$tgt = "$probesVCFFile.OK";
-$dep = "$candidateVCFFile.OK";
-@cmd = ("$vt construct_probes $candidateVCFFile -r $refGenomeFASTAFile -o $probesVCFFile 2> $auxDir/probes.log");
-makeStep($tgt, $dep, @cmd);
-
-#index probes sites
-$tgt = "$probesVCFFile.$indexExt.OK";
-$dep = "$probesVCFFile.OK";
-@cmd = ("$vt index $probesVCFFile 2> $probesVCFFile.$indexExt.log");
-makeStep($tgt, $dep, @cmd);
-
-#per sample discovery of sites
-my $candidateSitesVCFOutDir = "$outputDir/vcf";
-my $sampleGenotypesVCFFiles;
-my $sampleGenotypesVCFIndexOKFiles;
-mkdir($candidateSitesVCFOutDir);
-for my $sampleID (keys(%SAMPLE))
-{
-    mkdir("$candidateSitesVCFOutDir/$sampleID/");
-
-    my $sampleDir = "$candidateSitesVCFOutDir/$sampleID";
-    my $sampleVCFFile = "$sampleDir/$sampleID.genotypes.$ext";
-    my $sampleVCFFileIndex = "$sampleDir/$sampleID.genotypes.$ext.$indexExt";
-    
-    #genotype
-    $tgt = "$sampleVCFFile.OK";
-    $dep = "$probesVCFFile.OK";
-    @cmd = ("$vt genotype -b $SAMPLE{$sampleID}{HC} $probesVCFFile -r $refGenomeFASTAFile -s $sampleID -o $sampleVCFFile  2> $sampleDir/genotype.log");
-    makeStep($tgt, $dep, @cmd);
-    
-    #index
-    $tgt = "$sampleVCFFileIndex.OK";
-    $dep = "$sampleVCFFile.OK";
-    @cmd = ("$vt index $sampleVCFFile");
-    makeStep($tgt, $dep, @cmd);
-
-    $sampleGenotypesVCFFiles .= "$sampleVCFFile\n";
-    $sampleGenotypesVCFIndexOKFiles .= " $sampleVCFFileIndex.OK";
-}
+##construct probes for candidate sites
+#my $probesVCFFile = "$auxDir/probes.sites.$ext";
+#$tgt = "$probesVCFFile.OK";
+#$dep = "$candidateVCFFile.OK";
+#@cmd = ("$vt construct_probes $candidateVCFFile -r $refGenomeFASTAFile -o $probesVCFFile 2> $auxDir/probes.log");
+#makeStep($tgt, $dep, @cmd);
+#
+##index probes sites
+#$tgt = "$probesVCFFile.$indexExt.OK";
+#$dep = "$probesVCFFile.OK";
+#@cmd = ("$vt index $probesVCFFile 2> $probesVCFFile.$indexExt.log");
+#makeStep($tgt, $dep, @cmd);
+#
+##per sample discovery of sites
+#my $candidateSitesVCFOutDir = "$outputDir/vcf";
+#my $sampleGenotypesVCFFiles;
+#my $sampleGenotypesVCFIndexOKFiles;
+#mkdir($candidateSitesVCFOutDir);
+#for my $sampleID (keys(%SAMPLE))
+#{
+#    mkdir("$candidateSitesVCFOutDir/$sampleID/");
+#
+#    my $sampleDir = "$candidateSitesVCFOutDir/$sampleID";
+#    my $sampleVCFFile = "$sampleDir/$sampleID.genotypes.$ext";
+#    my $sampleVCFFileIndex = "$sampleDir/$sampleID.genotypes.$ext.$indexExt";
+#    
+#    #genotype
+#    $tgt = "$sampleVCFFile.OK";
+#    $dep = "$probesVCFFile.OK";
+#    @cmd = ("$vt genotype -b $SAMPLE{$sampleID}{HC} $probesVCFFile -r $refGenomeFASTAFile -s $sampleID -o $sampleVCFFile  2> $sampleDir/genotype.log");
+#    makeStep($tgt, $dep, @cmd);
+#    
+#    #index
+#    $tgt = "$sampleVCFFileIndex.OK";
+#    $dep = "$sampleVCFFile.OK";
+#    @cmd = ("$vt index $sampleVCFFile");
+#    makeStep($tgt, $dep, @cmd);
+#
+#    $sampleGenotypesVCFFiles .= "$sampleVCFFile\n";
+#    $sampleGenotypesVCFIndexOKFiles .= " $sampleVCFFileIndex.OK";
+#}
 
 ######################
 #3. Merge and Annotate
@@ -296,27 +296,11 @@ close MAK;
 ##########
 #functions
 ##########
-sub makeMos
+sub makeSlurm
 {
     my $cmd = shift;
     
-    if ($cluster eq "main")
-    {
-        return ("mosbatch -E/tmp -i -r`$clusterDir/pick_main_node $sleep` /bin/bash -c 'set pipefail; $cmd'");
-    }
-    elsif ($cluster eq "mini")
-    {
-        return ("mosbatch -E/tmp -i -r`$clusterDir/pick_mini_node $sleep` /bin/bash -c 'set pipefail; $cmd'");
-    }
-    elsif ($cluster eq "mini+")
-    {
-        return ("mosbatch -E/tmp -i -r`$clusterDir/pick_mini+_node $sleep` /bin/bash -c 'set pipefail; $cmd'");
-    }
-    else
-    {
-        print STDERR "$cluster not supported\n";
-        exit(1);
-    }
+    return ("srun -p $partition -r`$clusterDir/pick_main_node $sleep` /bin/bash -c 'set pipefail; $cmd'");
 }
 
 sub makeStep
@@ -328,7 +312,7 @@ sub makeStep
     my $cmd = "";
     for my $c (@cmd)
     {
-        $cmd .= "\t" . makeMos($c) . "\n";
+        $cmd .= "\t" . makeSlurm($c) . "\n";
     }
     $cmd .= "\ttouch $tgt\n";
     push(@cmds, $cmd);
