@@ -50,7 +50,6 @@ Getopt::Long::Configure ('bundling');
 
 if(!GetOptions ('h'=>\$help,
                 'o:s'=>\$outputDir,
-                'b:s'=>\$vtDir,
                 'm:s'=>\$makeFile,
                 'p:s'=>\$partition,
                 's:s'=>\$sampleFile,
@@ -75,7 +74,7 @@ if(!GetOptions ('h'=>\$help,
 }
 
 #programs
-my $vt = "$vtDir/vt";
+my $vt = "/net/fantasia/home/atks/programs/vt/vt";
 my $samtools = "/net/fantasia/home/atks/programs/samtools/samtools";
 my $bam = "/usr/cluster/bin/bam";
 
@@ -99,6 +98,7 @@ my $dep;
 my @cmd;
 my $inputVCFFile;
 my $outputVCFFile;
+my $processBySample = ($intervalWidth==0);
 
 mkpath($outputDir);
 my $logDir = "$outputDir/log";
@@ -122,6 +122,7 @@ while (<INDEX>)
         my ($sampleID, $bamPath) = split('\t', $_);
         $BAMFILE{$sampleID} = $bamPath;
         push(@SAMPLE, $sampleID);
+        mkpath("$auxDir/$sampleID");
     }
 }
 close(INDEX);
@@ -205,182 +206,97 @@ if ($writeIntervals)
     print `touch $outputDir/intervals/$intervalWidth.OK`;
 }
 
-###############
-#log start time
-###############
-my $logFile = "$logDir/run.log";
-$tgt = "$logFile.start.OK";
-$dep = "";
-@cmd = "date | awk '{print \"vt calling pipeline\\n\\nstart: \"\$\$0}' > $logFile";
-makeLocalStep($tgt, $dep, @cmd);
-
 #############
 #1. Discovery
 #############
-my $candidateSitesVCFFiles = "";
-my $candidateSitesVCFOKFiles = "";
 
-if ($intervalWidth!=0)
+if ($processBySample)
 {
-    my $intervalVCFFilesOK = "";
     for my $sampleID (@SAMPLE)
     {
-        mkdir("$auxDir/$sampleID/");
-        for my $i (0 .. $#intervals)
+        $outputVCFFile = "$auxDir/$sampleID/all.genotypes.bcf";
+        $tgt = "$outputVCFFile.OK";
+        $dep = "";
+        @cmd = ("$samtools view -h $BAMFILE{$sampleID} 20 -u | $bam clipoverlap --in -.ubam --out -.ubam | $vt discover2 -z -q 20 -b + -r $refGenomeFASTAFile -s $sampleID -o $outputVCFFile 2> $auxDir/$sampleID/all.discover2.log");
+        #@cmd = ("$vt discover2 -z -q 20 -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -I $intervalFiles[$i] -o $outputVCFFile 2> $auxDir/$sampleID/$intervals[$i].discover2.log");
+        makeJob($partition, $tgt, $dep, @cmd);
+    }    
+}
+else
+{
+    #log start time
+    my $logFile = "$logDir/run.log";
+    $tgt = "$logFile.start.OK";
+    $dep = "";
+    @cmd = "date | awk '{print \"vt calling pipeline\\n\\nstart: \"\$\$0}' > $logFile";
+    makeLocalStep($tgt, $dep, @cmd);
+
+    my @intervalSampleDiscoveryVCFFilesOK = ();
+    
+    #mine variants from aligned reads
+    for my $i (0 .. $#intervals)
+    {
+        my $intervalVCFFilesOK = "";
+        for my $sampleID (@SAMPLE)
         {
             $outputVCFFile = "$auxDir/$sampleID/$intervals[$i].genotypes.bcf";
             $tgt = "$outputVCFFile.OK";
             $dep = "";
-            #@cmd = ("$samtools view -h $BAMFILE{$sampleID} 20 -u | $bam clipoverlap --in -.ubam --out -.ubam | $vt discover2 -z -q 20 -b + -r $refGenomeFASTAFile -s $sampleID -I $intervalFiles[$i] -o $outputVCFFile 2> $auxDir/$sampleID/$intervals[$i].discover2.log");
-            @cmd = ("$vt discover2 -z -q 20 -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -I $intervalFiles[$i] -o $outputVCFFile 2> $auxDir/$sampleID/$intervals[$i].discover2.log");
+            @cmd = ("$samtools view -h $BAMFILE{$sampleID} 20 -u | $bam clipoverlap --in -.ubam --out -.ubam | $vt discover2 -z -q 20 -b + -r $refGenomeFASTAFile -s $sampleID -I $intervalFiles[$i] -o $outputVCFFile 2> $auxDir/$sampleID/$intervals[$i].discover2.log");
+            #@cmd = ("$vt discover2 -z -q 20 -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -I $intervalFiles[$i] -o $outputVCFFile 2> $auxDir/$sampleID/$intervals[$i].discover2.log");
             makeJob($partition, $tgt, $dep, @cmd);
+            
+            $intervalVCFFilesOK .= " $outputVCFFile.OK";
         }
+        
+        push(@intervalSampleDiscoveryVCFFilesOK, $intervalVCFFilesOK);
     }
     
-    #************
-    #log end time
-    #************
-    $tgt = "$logDir/end.calling.OK";
-    $dep = "$intervalVCFFilesOK";
-    @cmd = ("date | awk '{print \"end calling: \"\$\$0}' >> $logFile");
-    makeJob("local", $tgt, $dep, @cmd);
-}
-else
-{
-#    $outputVCFFile = "$vcfOutDir/all.vcf.gz";
-#    $tgt = "$outputVCFFile.OK";
-#    $dep = "";
-#    @cmd = ("$gatk -T UnifiedGenotyper -R $refGenomeFASTAFile -glm $variantType -I $bamListFile --genotyping_mode DISCOVERY -o $outputVCFFile --output_mode EMIT_VARIANTS_ONLY");
-#    makeStep($tgt, $dep, @cmd);
-#
-#    #************
-#    #log end time
-#    #************
-#    $tgt = "$logDir/end.calling.OK";
-#    $dep = "$outputVCFFile.OK";
-#    @cmd = ("date | awk '{print \"end calling: \"\$\$0}' >> $logFile");
-#    makeLocalStep($tgt, $dep, @cmd);
-}
-
-if ($intervalWidth!=0)
-{
+    #merge variants
     for my $i (0 .. $#intervals)
     {
-        open(IN, ">$auxDir/$intervals[$i]_vcf_file.list");
+        my $vcfFileList = "$auxDir/$intervals[$i]_vcf_file.list";
+        open(IN, ">$vcfFileList");
         my @files = map {"$auxDir/$_/$intervals[$i].genotypes.bcf"} @SAMPLE;
         print IN join("\n", @files); 
         close(IN);
         
-#        $outputVCFFile = "$auxDir/$sampleID/$intervals[$i].genotypes.bcf";
-#        $tgt = "$outputVCFFile.OK";
-#        $dep = "";
-##            @cmd = ("$samtools view -h $BAMFILE{$sampleID} 20 | $bam clipoverlap --in - --out - | $vt discover2 -l -z -q 20 -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -I $intervalFiles[$i] -o $outputVCFFile 2> $auxDir/$sampleID/$intervals[$i].discover2.log");
-#        @cmd = ("$vt discover2 -l -q 20 -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -I $intervalFiles[$i] -o $outputVCFFile 2> $auxDir/$sampleID/$intervals[$i].discover2.log");
-#        makeJob($partition, $tgt, $dep, @cmd);
-        
+        $outputVCFFile = "$auxDir/$intervals[$i].sites.bcf";
+        $tgt = "$outputVCFFile.OK";
+        $dep = $intervalSampleDiscoveryVCFFilesOK[$i];
+        @cmd = ("$vt merge_candidate_variants -L $vcfFileList -o $outputVCFFile 2> $auxDir/$intervals[$i].merge_candidate_variants.log");
+        makeJob($partition, $tgt, $dep, @cmd);
     }
     
+    #concatenate variants by chromosome
+    my $chromVCFFilesOK = "";
+    for my $chrom (@CHROM)
+    {
+        my @intervals =  @{$intervalsByChrom{$chrom}};
+        my $vcfFileList = "$auxDir/$chrom" . "_vcf_file.list";
+        open(IN, ">$vcfFileList");
+        my @files = map {"$auxDir/$_.sites.bcf"} @intervals;
+        print IN join("\n", @files); 
+        close(IN);
+                
+        $outputVCFFile = "$finalDir/$chrom.sites.bcf";
+        $tgt = "$outputVCFFile.OK";
+        my @filesOK = map {"$auxDir/$_.sites.bcf.OK"} @intervals;
+        $dep = join(" ", @filesOK);
+        @cmd = ("$vt cat -L $vcfFileList -o $outputVCFFile");
+        makeJob($partition, $tgt, $dep, @cmd);  
+        
+        $chromVCFFilesOK .= " $outputVCFFile.OK";    
+    }    
+    
+    #log end time
+    $tgt = "$logDir/end.discovery.OK";
+    $dep = "$chromVCFFilesOK";
+    @cmd = ("date | awk '{print \"end discovery: \"\$\$0}' >> $logFile");
+    makeJob("local", $tgt, $dep, @cmd);
 }
 
-##write candidate VCF files into a list
-#my $candidateVCFFileList = "$auxDir/candidate_vcf_files.txt";
-#open(IN, ">$candidateVCFFileList") ||die "Cannot open $candidateVCFFileList\n";
-#my $temp = $candidateSitesVCFFiles;
-#$temp =~ s/ /\n/g;
-#$temp =~ s/^\s+//;
-#print IN "$temp\n";
-#close(IN);
-#
-##merging and filtering of initial sites using likelhood ratio cut off of 2.
-#my $candidateVCFFile = "$auxDir/all.sites.$ext";
-#$tgt = "$candidateVCFFile.OK";
-#$dep =  $candidateSitesVCFOKFiles;
-#@cmd = ("$vt merge_candidate_variants -L $candidateVCFFileList -o $candidateVCFFile 2> $candidateVCFFile.log");
-#makeStep($tgt, $dep, @cmd);
-#
-##index candidate sites
-#$tgt = "$candidateVCFFile.$indexExt.OK";
-#$dep = "$candidateVCFFile.OK";
-#@cmd = ("$vt index $candidateVCFFile 2> $candidateVCFFile.$indexExt.log");
-#makeStep($tgt, $dep, @cmd);
 
-###############
-##2. Genotyping
-###############
-
-##construct probes for candidate sites
-#my $probesVCFFile = "$auxDir/probes.sites.$ext";
-#$tgt = "$probesVCFFile.OK";
-#$dep = "$candidateVCFFile.OK";
-#@cmd = ("$vt construct_probes $candidateVCFFile -r $refGenomeFASTAFile -o $probesVCFFile 2> $auxDir/probes.log");
-#makeStep($tgt, $dep, @cmd);
-#
-##index probes sites
-#$tgt = "$probesVCFFile.$indexExt.OK";
-#$dep = "$probesVCFFile.OK";
-#@cmd = ("$vt index $probesVCFFile 2> $probesVCFFile.$indexExt.log");
-#makeStep($tgt, $dep, @cmd);
-#
-##per sample discovery of sites
-#my $candidateSitesVCFOutDir = "$outputDir/vcf";
-#my $sampleGenotypesVCFFiles;
-#my $sampleGenotypesVCFIndexOKFiles;
-#mkdir($candidateSitesVCFOutDir);
-#for my $sampleID (keys(%SAMPLE))
-#{
-#    mkdir("$candidateSitesVCFOutDir/$sampleID/");
-#
-#    my $sampleDir = "$candidateSitesVCFOutDir/$sampleID";
-#    my $sampleVCFFile = "$sampleDir/$sampleID.genotypes.$ext";
-#    my $sampleVCFFileIndex = "$sampleDir/$sampleID.genotypes.$ext.$indexExt";
-#
-#    #genotype
-#    $tgt = "$sampleVCFFile.OK";
-#    $dep = "$probesVCFFile.OK";
-#    @cmd = ("$vt genotype -b $SAMPLE{$sampleID}{HC} $probesVCFFile -r $refGenomeFASTAFile -s $sampleID -o $sampleVCFFile  2> $sampleDir/genotype.log");
-#    makeStep($tgt, $dep, @cmd);
-#
-#    #index
-#    $tgt = "$sampleVCFFileIndex.OK";
-#    $dep = "$sampleVCFFile.OK";
-#    @cmd = ("$vt index $sampleVCFFile");
-#    makeStep($tgt, $dep, @cmd);
-#
-#    $sampleGenotypesVCFFiles .= "$sampleVCFFile\n";
-#    $sampleGenotypesVCFIndexOKFiles .= " $sampleVCFFileIndex.OK";
-#}
-
-#######################
-##3. Merge and Annotate
-#######################
-#
-##make merge list
-#my $mergedVCFFileList = "$auxDir/merge.vcf.list.txt";
-#chomp($sampleGenotypesVCFFiles);
-#open(IN, ">$mergedVCFFileList") || die "Cannot open $mergedVCFFileList";
-#print IN $sampleGenotypesVCFFiles;
-#close(IN);
-#
-##merge
-#my $mergedVCFFile = "$finalDir/all.genotypes.$ext";
-#$tgt = "$mergedVCFFile.OK";
-#$dep = "$sampleGenotypesVCFIndexOKFiles";
-#@cmd = ("$vt paste -L $mergedVCFFileList -o + | $vt compute_features + -o + 2> $finalDir/compute_features.log | $vt remove_overlap + -o $mergedVCFFile 2> $finalDir/remove_overlap.log");
-#makeStep($tgt, $dep, @cmd);
-#
-##index
-#$tgt = "$mergedVCFFile.$indexExt.OK";
-#$dep = "$mergedVCFFile.OK";
-#@cmd = ("$vt index $mergedVCFFile");
-#makeStep($tgt, $dep, @cmd);
-
-##############
-##log end time
-##############
-#$tgt = "$logFile.end.OK";
-#$dep = "$probesVCFFile.$indexExt.OK";
-#@cmd = ("\tdate | awk '{print \"end: \"\$\$0}' >> $logFile");
-#makeLocalStep($tgt, $dep, @cmd);
 
 ####################
 #Write out make file
