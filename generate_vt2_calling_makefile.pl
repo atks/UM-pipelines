@@ -107,6 +107,9 @@ my $auxDir = "$outputDir/aux";
 mkpath($auxDir);
 my $finalDir = "$outputDir/final";
 mkpath($finalDir);
+my $slurmScriptsDir = "$outputDir/slurm_scripts";
+mkpath($slurmScriptsDir);
+my $slurmScriptNo = 0;
 
 ###########################
 #Read samples and BAM paths
@@ -349,7 +352,24 @@ sub makeSlurm
     my $cmd = "";
     for my $c (@cmd)
     {
-        $cmd .= "\tsrun -p $partition " . $c . "\n";
+        #contains pipe
+        if ($c=~/\|/)
+        {
+            ++$slurmScriptNo;
+            my $slurmScriptFile = "$slurmScriptsDir/$slurmScriptNo.sh";
+            open(IN, ">$slurmScriptFile");
+            print IN "#!/bin/bash\n"; 
+            print IN "set pipefail; $c"; 
+            close(IN);
+            chmod(0755, $slurmScriptFile);
+            
+            $cmd .= "\techo '" . $c . "'\n";
+            $cmd .= "\tsrun -p $partition $slurmScriptFile\n";
+        }
+        else
+        {
+            $cmd .= "\tsrun -p $partition " . $c . "\n";
+        }
     }
     $cmd .= "\ttouch $tgt\n";
     push(@cmds, $cmd);
