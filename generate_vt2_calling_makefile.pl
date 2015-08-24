@@ -35,7 +35,6 @@ my $help;
 
 #
 my $outputDir;
-my $vtDir = "/net/fantasia/home/atks/dev/vt";
 my $clusterDir = "/net/fantasia/home/atks/programs/cluster";
 my $makeFile = "Makefile";
 my $partition = "nomosix";
@@ -81,7 +80,6 @@ my $bam = "/usr/cluster/bin/bam";
 printf("generate_vt2_calling_makefile.pl\n");
 printf("\n");
 printf("options: output dir           %s\n", $outputDir);
-printf("         vt path              %s\n", $vtDir);
 printf("         make file            %s\n", $makeFile);
 printf("         partition            %s\n", $partition);
 printf("         sample file          %s\n", $sampleFile);
