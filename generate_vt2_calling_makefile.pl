@@ -72,7 +72,7 @@ if(!GetOptions ('h'=>\$help,
 }
 
 #programs
-my $vt = "/net/fantasia/home/atks/dev/vt/vt";
+my $vt = "/net/fantasia/home/atks/programs/vt/vt";
 my $samtools = "/net/fantasia/home/atks/programs/samtools/samtools";
 my $bam = "/usr/cluster/bin/bam";
 
