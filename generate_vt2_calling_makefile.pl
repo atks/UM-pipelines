@@ -22,6 +22,7 @@ generate_vt2_calling_makefile
   -r     reference sequence fasta file
   -b     binaries directory : location of binaries required for this pipeline
   -o     output directory : location of all output files
+  -d     slurm script sub directory
   -m     output make file
 
  example:
@@ -35,12 +36,13 @@ my $help;
 
 #
 my $outputDir;
+my $slurmScriptsSubDir;
 my $makeFile = "Makefile";
 my $partition = "nomosix";
 my $sleep = 0;
 my $sampleFile = "";
 my $intervalWidth = 20000000;
-my $sequenceLengthFile =
+my $chromosomes;
 my $refGenomeFASTAFile = "";
 
 #initialize options
@@ -48,16 +50,17 @@ Getopt::Long::Configure ('bundling');
 
 if(!GetOptions ('h'=>\$help,
                 'o:s'=>\$outputDir,
+                'd:s'=>\$slurmScriptsSubDir,
                 'm:s'=>\$makeFile,
                 'p:s'=>\$partition,
                 's:s'=>\$sampleFile,
                 'w:s'=>\$intervalWidth,
-                'l:s'=>\$sequenceLengthFile,
+                'c:s'=>\$chromosomes,
                 'r:s'=>\$refGenomeFASTAFile
                 )
   || !defined($outputDir)
   || !defined($sampleFile)
-  || !defined($sequenceLengthFile)
+  || !defined($chromosomes)
   || !defined($refGenomeFASTAFile)
   || scalar(@ARGV)!=0)
 {
@@ -78,13 +81,14 @@ my $bam = "/usr/cluster/bin/bam";
 
 printf("generate_vt2_calling_makefile.pl\n");
 printf("\n");
-printf("options: output dir           %s\n", $outputDir);
-printf("         make file            %s\n", $makeFile);
-printf("         partition            %s\n", $partition);
-printf("         sample file          %s\n", $sampleFile);
-printf("         interval width       %s\n", $intervalWidth);
-printf("         sequence length file %s\n", $sequenceLengthFile);
-printf("         reference            %s\n", $refGenomeFASTAFile);
+printf("options: output dir            %s\n", $outputDir);
+printf("         slurm scripts sub dir %s\n", $slurmScriptsSubDir);
+printf("         make file             %s\n", $makeFile);
+printf("         partition             %s\n", $partition);
+printf("         sample file           %s\n", $sampleFile);
+printf("         interval width        %s\n", $intervalWidth);
+printf("         chromosomes           %s\n", $chromosomes);
+printf("         reference             %s\n", $refGenomeFASTAFile);
 printf("\n");
 
 my @tgts = ();
@@ -95,7 +99,7 @@ my $dep;
 my @cmd;
 my $inputVCFFile;
 my $outputVCFFile;
-my $processBySample = ($intervalWidth==0);
+my $processByGenome = ($intervalWidth==0);
 
 mkpath($outputDir);
 my $logDir = "$outputDir/log";
@@ -104,7 +108,7 @@ my $auxDir = "$outputDir/aux";
 mkpath($auxDir);
 my $finalDir = "$outputDir/final";
 mkpath($finalDir);
-my $slurmScriptsDir = "$outputDir/slurm_scripts";
+my $slurmScriptsDir = "$outputDir/slurm_scripts/$slurmScriptsSubDir";
 mkpath($slurmScriptsDir);
 my $slurmScriptNo = 0;
 my $logFile = "$logDir/run.log";
@@ -131,25 +135,30 @@ close(INDEX);
 ###################
 #Generate intervals
 ###################
-my %intervalsByChrom = ();
+my %intervalNamesByChrom = ();
 my @intervalNames = ();
 my @intervals = ();
 my @CHROM = ();
 
 mkpath("$outputDir/intervals/");
-open(SQ,"$sequenceLengthFile") || die "Cannot open $sequenceLengthFile\n";
+my $refGenomeFASTAIndexFile = "$refGenomeFASTAFile.fai";
+open(SQ," $refGenomeFASTAIndexFile ") || die "Cannot open  $refGenomeFASTAIndexFile \n";
+my %CHROM = ();
+map {$CHROM{$_}=1} split(",", $chromosomes);
 while (<SQ>)
 {
     s/\r?\n?$//;
     if(!/^#/)
     {
-        my ($chrom, $len) = split('\t', $_);
+        my ($chrom, $len, $rest) = split('\t', $_);
 
+        next if (!exists($CHROM{$chrom}));
+        
         print "processing $chrom\t$len ";
 
         push(@CHROM, $chrom);
 
-        $intervalsByChrom{$chrom} = ();
+        $intervalNamesByChrom{$chrom} = ();
         my $count = 0;
         for my $i (0 .. floor($len/$intervalWidth))
         {
@@ -171,6 +180,10 @@ while (<SQ>)
             }
 
             $count++;
+
+            push(@intervals, $interval);
+            push(@intervalNames, $intervalName);
+            push(@{$intervalNamesByChrom{$chrom}}, $intervalName);
         }
 
         print "added $count intervals\n";
@@ -182,17 +195,17 @@ close(SQ);
 #1. Discovery
 #############
 
-if ($processBySample)
+if ($processByGenome)
 {
     for my $sampleID (@SAMPLE)
     {
         $outputVCFFile = "$auxDir/$sampleID/all.sites.bcf";
         $tgt = "$outputVCFFile.OK";
         $dep = "";
-        @cmd = ("$samtools view -h $BAMFILE{$sampleID} 20 -u | $bam clipoverlap --in -.ubam --out -.ubam | $vt discover2 -z -q 20 -b + -r $refGenomeFASTAFile -s $sampleID -o $outputVCFFile 2> $auxDir/$sampleID/all.discover2.log");
+        @cmd = ("$samtools view -h $BAMFILE{$sampleID} -u | $bam clipoverlap --in -.ubam --out -.ubam | $vt discover2 -z -q 20 -b + -r $refGenomeFASTAFile -s $sampleID -o $outputVCFFile 2> $auxDir/$sampleID/all.discover2.log");
         #@cmd = ("$vt discover2 -z -q 20 -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -I $intervalFiles[$i] -o $outputVCFFile 2> $auxDir/$sampleID/$intervals[$i].discover2.log");
         makeJob($partition, $tgt, $dep, @cmd);
-    }    
+    }
 }
 else
 {
@@ -203,7 +216,7 @@ else
     makeLocalStep($tgt, $dep, @cmd);
 
     my @intervalSampleDiscoveryVCFFilesOK = ();
-    
+
     #mine variants from aligned reads
     for my $i (0 .. $#intervals)
     {
@@ -216,50 +229,49 @@ else
             @cmd = ("$samtools view -h $BAMFILE{$sampleID} $intervals[$i] -u | $bam clipoverlap --in -.ubam --out -.ubam | $vt discover2 -z -q 20 -b + -r $refGenomeFASTAFile -s $sampleID -i $intervals[$i] -o $outputVCFFile 2> $auxDir/$sampleID/$intervalNames[$i].discover2.log");
             #@cmd = ("$vt discover2 -z -q 20 -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -I $intervalFiles[$i] -o $outputVCFFile 2> $auxDir/$sampleID/$intervals[$i].discover2.log");
             makeJob($partition, $tgt, $dep, @cmd);
-            
+
             $intervalVCFFilesOK .= " $outputVCFFile.OK";
         }
-        
+
         push(@intervalSampleDiscoveryVCFFilesOK, $intervalVCFFilesOK);
     }
-    
+
     #merge variants
     for my $i (0 .. $#intervals)
     {
         my $vcfFileList = "$auxDir/$intervalNames[$i]_vcf_file.list";
         open(IN, ">$vcfFileList");
         my @files = map {"$auxDir/$_/$intervalNames[$i].sites.bcf"} @SAMPLE;
-        print IN join("\n", @files); 
+        print IN join("\n", @files);
         close(IN);
-        
+
         $outputVCFFile = "$auxDir/$intervalNames[$i].sites.bcf";
         $tgt = "$outputVCFFile.OK";
         $dep = $intervalSampleDiscoveryVCFFilesOK[$i];
         @cmd = ("$vt merge_candidate_variants2 -L $vcfFileList -o $outputVCFFile 2> $auxDir/$intervalNames[$i].merge_candidate_variants.log");
         makeJob($partition, $tgt, $dep, @cmd);
     }
-    
+
     #concatenate variants by chromosome
     my $chromVCFFilesOK = "";
     for my $chrom (@CHROM)
     {
-        my @intervals =  @{$intervalsByChrom{$chrom}};
         my $vcfFileList = "$auxDir/$chrom" . "_vcf_file.list";
         open(IN, ">$vcfFileList");
-        my @files = map {"$auxDir/$_.sites.bcf"} @intervalNames;
-        print IN join("\n", @files); 
+        my @files = map {"$auxDir/$_.sites.bcf"} @{$intervalNamesByChrom{$chrom}};
+        print IN join("\n", @files);
         close(IN);
-                
+
         $outputVCFFile = "$finalDir/$chrom.sites.bcf";
         $tgt = "$outputVCFFile.OK";
-        my @filesOK = map {"$auxDir/$_.sites.bcf.OK"} @intervalNames;
+        my @filesOK = map {"$auxDir/$_.sites.bcf.OK"} @{$intervalNamesByChrom{$chrom}};
         $dep = join(" ", @filesOK);
         @cmd = ("$vt cat -L $vcfFileList -o $outputVCFFile");
-        makeJob($partition, $tgt, $dep, @cmd);  
-        
-        $chromVCFFilesOK .= " $outputVCFFile.OK";    
-    }    
-    
+        makeJob($partition, $tgt, $dep, @cmd);
+
+        $chromVCFFilesOK .= " $outputVCFFile.OK";
+    }
+
     #log end time
     $tgt = "$logDir/end.discovery.OK";
     $dep = "$chromVCFFilesOK";
@@ -281,7 +293,7 @@ else
 #        @cmd = ("$samtools view -h $BAMFILE{$sampleID} -u | $bam clipoverlap --in -.ubam --out -.ubam | $vt genotype2 -b + -r $refGenomeFASTAFile -s $sampleID -o $outputVCFFile 2> $auxDir/$sampleID/all.genotype2.log");
 #        #@cmd = ("$vt genotype2 -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -I $intervalFiles[$i] -o $outputVCFFile 2> $auxDir/$sampleID/$intervals[$i].genotype2.log");
 #        makeJob($partition, $tgt, $dep, @cmd);
-#    }    
+#    }
 #}
 #else
 #{
@@ -292,7 +304,7 @@ else
 #    makeLocalStep($tgt, $dep, @cmd);
 #
 #    my @intervalSampleGenotypingVCFFilesOK = ();
-#    
+#
 #    #mine variants from aligned reads
 #    for my $i (0 .. $#intervals)
 #    {
@@ -306,15 +318,15 @@ else
 #            @cmd = ("$samtools view -h $BAMFILE{$sampleID} $intervals[$i] -u | $bam clipoverlap --in -.ubam --out -.ubam | $vt genotype2 $inputVCFFile -b + -r $refGenomeFASTAFile -s $sampleID -i $intervals[$i] -o $outputVCFFile 2> $auxDir/$sampleID/$intervalNames[$i].genotype2.log");
 #            #@cmd = ("$vt genotype2 -z -q 20 -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -I $intervalFiles[$i] -o $outputVCFFile 2> $auxDir/$sampleID/$intervals[$i].genotype2.log");
 #            makeJob($partition, $tgt, $dep, @cmd);
-#            
+#
 #            $intervalVCFFilesOK .= " $outputVCFFile.OK";
 #        }
-#        
+#
 #        push(@intervalSampleGenotypingVCFFilesOK, $intervalVCFFilesOK);
 #    }
-#    
+#
 #    my $intervalSampleGenotypingVCFFiles = join(" ", @intervalSampleGenotypingVCFFilesOK);
-#    
+#
 #    #log end time
 #    $tgt = "$logDir/end.genotyping.OK";
 #    $dep = $intervalSampleGenotypingVCFFiles;
@@ -379,11 +391,11 @@ sub makeSlurm
             ++$slurmScriptNo;
             my $slurmScriptFile = "$slurmScriptsDir/$slurmScriptNo.sh";
             open(IN, ">$slurmScriptFile");
-            print IN "#!/bin/bash\n"; 
-            print IN "set pipefail; $c"; 
+            print IN "#!/bin/bash\n";
+            print IN "set pipefail; $c";
             close(IN);
             chmod(0755, $slurmScriptFile);
-            
+
             $cmd .= "\techo '" . $c . "'\n";
             $cmd .= "\tsrun -p $partition $slurmScriptFile\n";
         }
