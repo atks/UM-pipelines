@@ -217,6 +217,25 @@ else
 
     my @intervalSampleDiscoveryVCFFilesOK = ();
 
+    #generate slurm job array script
+    my $noJobs = scalar(@intervals)*scalar(@SAMPLE);
+    my $no = 0;
+    mkpath("$slurmScriptsDir/job_array_output");
+    my $slurmJobArrayScript = "$slurmScriptsDir/job_array.sh";
+    open(SCRIPT, ">$slurmJobArrayScript");
+    print SCRIPT <<SCRIPT;
+\#!/bin/bash
+\#SBATCH --partition=nomosix
+\#SBATCH --error=$slurmScriptsDir/job_array_output/test_%a_%N_%j.err
+\#SBATCH --output=$slurmScriptsDir/job_array_output/test_%a_%N_%j.log
+\#SBATCH --job-name=Array
+\#SBATCH --time=6:0:0
+\#SBATCH --mem=2G
+\#SBATCH --cpus-per-task=1
+\#SBATCH --array=1-$noJobs
+declare -a commands
+SCRIPT
+
     #mine variants from aligned reads
     for my $i (0 .. $#intervals)
     {
@@ -229,12 +248,17 @@ else
             @cmd = ("$samtools view -h $BAMFILE{$sampleID} $intervals[$i] -u | $bam clipoverlap --in -.ubam --out -.ubam | $vt discover2 -z -q 20 -b + -r $refGenomeFASTAFile -s $sampleID -i $intervals[$i] -o $outputVCFFile 2> $auxDir/$sampleID/$intervalNames[$i].discover2.log");
             #@cmd = ("$vt discover2 -z -q 20 -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -I $intervalFiles[$i] -o $outputVCFFile 2> $auxDir/$sampleID/$intervals[$i].discover2.log");
             makeJob($partition, $tgt, $dep, @cmd);
-
+            
+            print SCRIPT "commands[" . ++$no . "]= [ ! -e $outputVCFFile.OK ] && $slurmScriptsDir/$slurmScriptNo.sh && touch $outputVCFFile.OK;\n";
+            
             $intervalVCFFilesOK .= " $outputVCFFile.OK";
         }
 
         push(@intervalSampleDiscoveryVCFFilesOK, $intervalVCFFilesOK);
     }
+
+    print SCRIPT "bash -c \"\${commands[\${SLURM_ARRAY_TASK_ID}]}\"\n";
+    close(SCRIPT);
 
     #merge variants
     for my $i (0 .. $#intervals)
