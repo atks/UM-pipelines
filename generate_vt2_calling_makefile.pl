@@ -278,7 +278,7 @@ SCRIPT
     }
 
     #concatenate variants by chromosome
-    my $chromVCFFilesOK = "";
+    my $chromVCFFileIndicesOK = "";
     for my $chrom (@CHROM)
     {
         my $vcfFileList = "$auxDir/$chrom" . "_vcf_file.list";
@@ -294,12 +294,18 @@ SCRIPT
         @cmd = ("$vt cat -L $vcfFileList -o $outputVCFFile");
         makeJob($partition, $tgt, $dep, @cmd);
 
-        $chromVCFFilesOK .= " $outputVCFFile.OK";
+        $inputVCFFile = "$finalDir/$chrom.sites.bcf";
+        $tgt = "$inputVCFFile.csi.OK";
+        $dep = "$inputVCFFile.OK";
+        @cmd = ("$vt index $inputVCFFile");
+        makeJob($partition, $tgt, $dep, @cmd);
+
+        $chromVCFFileIndicesOK .= " $tgt";
     }
 
     #log end time
     $tgt = "$logDir/end.discovery.OK";
-    $dep = "$chromVCFFilesOK";
+    $dep = "$chromVCFFileIndicesOK";
     @cmd = ("date | awk '{print \"end discovery: \"\$\$0}' >> $logFile");
     makeJob("local", $tgt, $dep, @cmd);
 }
