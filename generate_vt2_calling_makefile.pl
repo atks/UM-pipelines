@@ -79,6 +79,7 @@ if(!GetOptions ('h'=>\$help,
 
 #programs
 my $vt = "/net/fantasia/home/atks/programs/vt/vt";
+#my $vt = "/net/fantasia/home/atks/dev/vt/vt";
 my $samtools = "/net/fantasia/home/atks/programs/samtools/samtools";
 my $bam = "/usr/cluster/bin/bam";
 
@@ -293,23 +294,46 @@ SCRIPT
     ##################################    
     if ($generateIntermediateFiles)
     {
-        #concatenate annotated candidate variant lists
-        $inputVCFFileList = "$unionDir/candidates_vcf_file.list";
-        open(OUT, ">$inputVCFFileList");
-        for my $intervalName (@intervalNames) {print OUT "$unionDir/$intervalName.sites.bcf\n"; }
-        close(OUT);
-        
-        $outputVCFFile = "$intermediateDir/all.discovery.sites.bcf";
-        $tgt = "$outputVCFFile.OK";
-        $dep = join(" ", map {"$unionDir/$_.sites.bcf.OK"} @intervalNames);
-        @cmd = ("$vt cat -L $inputVCFFileList -o $outputVCFFile");
-        makeJob($partition, $tgt, $dep, @cmd);
-        
-        $inputVCFFile = "$intermediateDir/all.discovery.sites.bcf";
-        $tgt = "$inputVCFFile.csi.OK";
-        $dep = "$inputVCFFile.OK";
-        @cmd = ("$vt index $inputVCFFile");
-        makeJob($partition, $tgt, $dep, @cmd);
+        if (scalar(@CHROM)!=1)
+        {
+            #concatenate annotated candidate variant lists
+            $inputVCFFileList = "$unionDir/candidates_vcf_file.list";
+            open(OUT, ">$inputVCFFileList");
+            for my $intervalName (@intervalNames) {print OUT "$unionDir/$intervalName.sites.bcf\n"; }
+            close(OUT);
+            
+            $outputVCFFile = "$intermediateDir/all.discovery.sites.bcf";
+            $tgt = "$outputVCFFile.OK";
+            $dep = join(" ", map {"$unionDir/$_.sites.bcf.OK"} @intervalNames);
+            @cmd = ("$vt cat -L $inputVCFFileList -o $outputVCFFile");
+            makeJob($partition, $tgt, $dep, @cmd);
+            
+            $inputVCFFile = "$intermediateDir/all.discovery.sites.bcf";
+            $tgt = "$inputVCFFile.csi.OK";
+            $dep = "$inputVCFFile.OK";
+            @cmd = ("$vt index $inputVCFFile");
+            makeJob($partition, $tgt, $dep, @cmd);
+        }
+        else
+        {
+            #concatenate annotated candidate variant lists
+            $inputVCFFileList = "$unionDir/candidates_vcf_file.list";
+            open(OUT, ">$inputVCFFileList");
+            for my $intervalName (@intervalNames) {print OUT "$unionDir/$intervalName.sites.bcf\n"; }
+            close(OUT);
+            
+            $outputVCFFile = "$intermediateDir/$CHROM[0].discovery.sites.bcf";
+            $tgt = "$outputVCFFile.OK";
+            $dep = join(" ", map {"$unionDir/$_.sites.bcf.OK"} @intervalNames);
+            @cmd = ("$vt cat -L $inputVCFFileList -o $outputVCFFile");
+            makeJob($partition, $tgt, $dep, @cmd);
+            
+            $inputVCFFile = "$intermediateDir/$CHROM[0].discovery.sites.bcf";
+            $tgt = "$inputVCFFile.csi.OK";
+            $dep = "$inputVCFFile.OK";
+            @cmd = ("$vt index $inputVCFFile");
+            makeJob($partition, $tgt, $dep, @cmd);
+        }
     }
     
     #log end time
@@ -349,8 +373,9 @@ else
             $outputVCFFile = "$individualDir/$sampleID/$intervalNames[$i].genotypes.bcf";
             $tgt = "$outputVCFFile.OK";
             $dep = "$inputVCFFile.OK";
-            @cmd = ("[ ! -e $logDir/start.genotyping.OK ] && $logDir/start.genotyping.OK && date | awk '{print \"start genotyping: \"\$\$0}' >> $logFile\n" .
-                    "\t$vt genotype2 $inputVCFFile -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -i $intervals[$i] -o $outputVCFFile 2> $individualDir/$sampleID/$intervalNames[$i].genotype2.log");
+            @cmd = ("$vt genotype2 $inputVCFFile -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -i $intervals[$i] -o $outputVCFFile 2> $individualDir/$sampleID/$intervalNames[$i].genotype2.log");
+#            @cmd = ("[ ! -e $logDir/start.genotyping.OK ] && touch $logDir/start.genotyping.OK && date | awk '{print \"start genotyping: \"\$\$0}' >> $logFile\n" .
+#                    "\t$vt genotype2 $inputVCFFile -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -i $intervals[$i] -o $outputVCFFile 2> $individualDir/$sampleID/$intervalNames[$i].genotype2.log");
             makeJob($partition, $tgt, $dep, @cmd);
 
             $intervalVCFFilesOK .= " $outputVCFFile.OK";
@@ -375,22 +400,44 @@ if ($generateIntermediateFiles)
 {
     if (scalar(@SAMPLE)==1)
     {
-        $inputVCFFileList = "$unionDir/genotypes_vcf_file.list";
-        open(OUT, ">$inputVCFFileList");
-        for my $intervalName (@intervalNames) {print OUT "$individualDir/$SAMPLE[0]/$intervalName.genotypes.bcf\n"; }
-        close(OUT);
-        
-        $outputVCFFile = "$intermediateDir/$SAMPLE[0].genotypes.bcf";
-        $tgt = "$outputVCFFile.OK";
-        $dep = join(" ", map {"$individualDir/$SAMPLE[0]/$_.genotypes.bcf.OK"} @intervalNames);
-        @cmd = ("$vt cat -L $inputVCFFileList -o $outputVCFFile");
-        makeJob($partition, $tgt, $dep, @cmd);
-        
-        $inputVCFFile = "$intermediateDir/$SAMPLE[0].genotypes.bcf";
-        $tgt = "$inputVCFFile.csi.OK";
-        $dep = "$inputVCFFile.OK";
-        @cmd = ("$vt index $inputVCFFile");
-        makeJob($partition, $tgt, $dep, @cmd);
+        if (scalar(@CHROM)!=1)
+        {
+            $inputVCFFileList = "$unionDir/genotypes_vcf_file.list";
+            open(OUT, ">$inputVCFFileList");
+            for my $intervalName (@intervalNames) {print OUT "$individualDir/$SAMPLE[0]/$intervalName.genotypes.bcf\n"; }
+            close(OUT);
+            
+            $outputVCFFile = "$intermediateDir/$SAMPLE[0].genotypes.bcf";
+            $tgt = "$outputVCFFile.OK";
+            $dep = join(" ", map {"$individualDir/$SAMPLE[0]/$_.genotypes.bcf.OK"} @intervalNames);
+            @cmd = ("$vt cat -L $inputVCFFileList -o $outputVCFFile");
+            makeJob($partition, $tgt, $dep, @cmd);
+            
+            $inputVCFFile = "$intermediateDir/$SAMPLE[0].genotypes.bcf";
+            $tgt = "$inputVCFFile.csi.OK";
+            $dep = "$inputVCFFile.OK";
+            @cmd = ("$vt index $inputVCFFile");
+            makeJob($partition, $tgt, $dep, @cmd);
+        }
+        else
+        {
+            $inputVCFFileList = "$unionDir/genotypes_vcf_file.list";
+            open(OUT, ">$inputVCFFileList");
+            for my $intervalName (@intervalNames) {print OUT "$individualDir/$SAMPLE[0]/$intervalName.genotypes.bcf\n"; }
+            close(OUT);
+            
+            $outputVCFFile = "$intermediateDir/$CHROM[0].$SAMPLE[0].genotypes.bcf";
+            $tgt = "$outputVCFFile.OK";
+            $dep = join(" ", map {"$individualDir/$SAMPLE[0]/$_.genotypes.bcf.OK"} @intervalNames);
+            @cmd = ("$vt cat -L $inputVCFFileList -o $outputVCFFile");
+            makeJob($partition, $tgt, $dep, @cmd);
+            
+            $inputVCFFile = "$intermediateDir/$CHROM[0].$SAMPLE[0].genotypes.bcf";
+            $tgt = "$inputVCFFile.csi.OK";
+            $dep = "$inputVCFFile.OK";
+            @cmd = ("$vt index $inputVCFFile");
+            makeJob($partition, $tgt, $dep, @cmd);
+        }
     }
 }
 
@@ -478,7 +525,7 @@ sub makeLocalStep
     my $cmd = "";
     for my $c (@cmd)
     {
-        $cmd .= "\t" . $c . "\n";
+        $cmd .= "\tset pipefail; " . $c . "\n";
     }
     $cmd .= "\ttouch $tgt\n";
     push(@cmds, $cmd);
