@@ -46,6 +46,7 @@ my $intervalWidth = 20000000;
 my $chromosomes;
 my $refGenomeFASTAFile = "";
 my $generateIntermediateFiles = 0;
+my $useDevelopmentVT = 0;
 
 #initialize options
 Getopt::Long::Configure ('bundling');
@@ -59,6 +60,7 @@ if(!GetOptions ('h'=>\$help,
                 'w:s'=>\$intervalWidth,
                 'c:s'=>\$chromosomes,
                 'i'=>\$generateIntermediateFiles,
+                'x'=>\$useDevelopmentVT,
                 'r:s'=>\$refGenomeFASTAFile
                 )
   || !defined($outputDir)
@@ -78,8 +80,7 @@ if(!GetOptions ('h'=>\$help,
 }
 
 #programs
-my $vt = "/net/fantasia/home/atks/programs/vt/vt";
-#my $vt = "/net/fantasia/home/atks/dev/vt/vt";
+my $vt = $useDevelopmentVT ? "/net/fantasia/home/atks/dev/vt/vt" : "/net/fantasia/home/atks/programs/vt/vt";
 my $samtools = "/net/fantasia/home/atks/programs/samtools/samtools";
 my $bam = "/usr/cluster/bin/bam";
 
@@ -94,6 +95,7 @@ printf("         interval width               %s\n", $intervalWidth);
 printf("         chromosomes                  %s\n", $chromosomes);
 printf("         reference                    %s\n", $refGenomeFASTAFile);
 printf("         generate intermediate files  %s\n", $generateIntermediateFiles ? "true" : "false");
+printf("         use development vt           %s\n", $useDevelopmentVT ? "true" : "false");
 printf("\n");
 
 my @tgts = ();
@@ -378,6 +380,12 @@ else
 #                    "\t$vt genotype2 $inputVCFFile -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -i $intervals[$i] -o $outputVCFFile 2> $individualDir/$sampleID/$intervalNames[$i].genotype2.log");
             makeJob($partition, $tgt, $dep, @cmd);
 
+            $inputVCFFile = "$individualDir/$sampleID/$intervalNames[$i].genotypes.bcf";
+            $tgt = "$inputVCFFile.csi.OK";
+            $dep = "$inputVCFFile.OK";
+            @cmd = ("$vt index $inputVCFFile");
+            makeJob($partition, $tgt, $dep, @cmd);
+
             $intervalVCFFilesOK .= " $outputVCFFile.OK";
         }
 
@@ -418,6 +426,21 @@ if ($generateIntermediateFiles)
             $dep = "$inputVCFFile.OK";
             @cmd = ("$vt index $inputVCFFile");
             makeJob($partition, $tgt, $dep, @cmd);
+            
+            $inputVCFFile = "$intermediateDir/$SAMPLE[0].genotypes.bcf";
+            my $outputFile = "$intermediateDir/profile_na12878.snps.txt";
+            $tgt = "$outputFile.OK";
+            $dep = "$inputVCFFile.csi.OK";
+            @cmd = ("$vt profile_na12878 $inputVCFFile -g /net/fantasia/home/atks/ref/vt/grch37/NA12878.snps.reference.txt  -r ~/ref/genome/hs37d5.fa  -f \"VTYPE==SNP\" 2> $outputFile");
+            makeJob($partition, $tgt, $dep, @cmd);
+            
+            $inputVCFFile = "$intermediateDir/$SAMPLE[0].genotypes.bcf";
+            $outputFile = "$intermediateDir/profile_na12878.indels.txt";
+            $tgt = "$outputFile.OK";
+            $dep = "$inputVCFFile.csi.OK";
+            @cmd = ("$vt profile_na12878 $inputVCFFile -g /net/fantasia/home/atks/ref/vt/grch37/NA12878.indels.reference.txt  -r ~/ref/genome/hs37d5.fa  -f \"VTYPE==INDEL\" 2> $outputFile");
+            makeJob($partition, $tgt, $dep, @cmd);
+            
         }
         else
         {
@@ -436,6 +459,20 @@ if ($generateIntermediateFiles)
             $tgt = "$inputVCFFile.csi.OK";
             $dep = "$inputVCFFile.OK";
             @cmd = ("$vt index $inputVCFFile");
+            makeJob($partition, $tgt, $dep, @cmd);
+            
+            $inputVCFFile = "$intermediateDir/$CHROM[0].$SAMPLE[0].genotypes.bcf";
+            my $outputFile = "$intermediateDir/$CHROM[0].profile_na12878.snps.txt";
+            $tgt = "$outputFile.OK";
+            $dep = "$inputVCFFile.csi.OK";
+            @cmd = ("$vt profile_na12878 $inputVCFFile -g /net/fantasia/home/atks/ref/vt/grch37/NA12878.snps.reference.txt  -r ~/ref/genome/hs37d5.fa -i $CHROM[0] -f \"VTYPE==SNP\" 2> $outputFile");
+            makeJob($partition, $tgt, $dep, @cmd);
+            
+            $inputVCFFile = "$intermediateDir/$CHROM[0].$SAMPLE[0].genotypes.bcf";
+            $outputFile = "$intermediateDir/$CHROM[0].profile_na12878.indels.txt";
+            $tgt = "$outputFile.OK";
+            $dep = "$inputVCFFile.csi.OK";
+            @cmd = ("$vt profile_na12878 $inputVCFFile -g /net/fantasia/home/atks/ref/vt/grch37/NA12878.indels.reference.txt  -r ~/ref/genome/hs37d5.fa -i $CHROM[0] -f \"VTYPE==INDEL\"  2> $outputFile");
             makeJob($partition, $tgt, $dep, @cmd);
         }
     }
