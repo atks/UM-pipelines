@@ -118,8 +118,8 @@ my $individualDir = "$outputDir/aux/individual";
 mkpath($individualDir);
 my $unionDir = "$outputDir/aux/union";
 mkpath($unionDir);
-my $intermediateDir = "$outputDir/aux/intermediate";
-mkpath($intermediateDir);
+my $evaluationDir = "$outputDir/aux/evaluation";
+mkpath($evaluationDir);
 my $finalDir = "$outputDir/final";
 mkpath($finalDir);
 my $slurmScriptsDir = "$outputDir/slurm_scripts/$slurmScriptsSubDir";
@@ -304,13 +304,13 @@ SCRIPT
             for my $intervalName (@intervalNames) {print OUT "$unionDir/$intervalName.sites.bcf\n"; }
             close(OUT);
             
-            $outputVCFFile = "$intermediateDir/all.discovery.sites.bcf";
+            $outputVCFFile = "$evaluationDir/all.discovery.sites.bcf";
             $tgt = "$outputVCFFile.OK";
             $dep = join(" ", map {"$unionDir/$_.sites.bcf.OK"} @intervalNames);
             @cmd = ("$vt cat -L $inputVCFFileList -o $outputVCFFile");
             makeJob($partition, $tgt, $dep, @cmd);
             
-            $inputVCFFile = "$intermediateDir/all.discovery.sites.bcf";
+            $inputVCFFile = "$evaluationDir/all.discovery.sites.bcf";
             $tgt = "$inputVCFFile.csi.OK";
             $dep = "$inputVCFFile.OK";
             @cmd = ("$vt index $inputVCFFile");
@@ -324,13 +324,13 @@ SCRIPT
             for my $intervalName (@intervalNames) {print OUT "$unionDir/$intervalName.sites.bcf\n"; }
             close(OUT);
             
-            $outputVCFFile = "$intermediateDir/$CHROM[0].discovery.sites.bcf";
+            $outputVCFFile = "$evaluationDir/$CHROM[0].discovery.sites.bcf";
             $tgt = "$outputVCFFile.OK";
             $dep = join(" ", map {"$unionDir/$_.sites.bcf.OK"} @intervalNames);
             @cmd = ("$vt cat -L $inputVCFFileList -o $outputVCFFile");
             makeJob($partition, $tgt, $dep, @cmd);
             
-            $inputVCFFile = "$intermediateDir/$CHROM[0].discovery.sites.bcf";
+            $inputVCFFile = "$evaluationDir/$CHROM[0].discovery.sites.bcf";
             $tgt = "$inputVCFFile.csi.OK";
             $dep = "$inputVCFFile.OK";
             @cmd = ("$vt index $inputVCFFile");
@@ -415,27 +415,27 @@ if ($generateIntermediateFiles)
             for my $intervalName (@intervalNames) {print OUT "$individualDir/$SAMPLE[0]/$intervalName.genotypes.bcf\n"; }
             close(OUT);
             
-            $outputVCFFile = "$intermediateDir/$SAMPLE[0].genotypes.bcf";
+            $outputVCFFile = "$evaluationDir/$SAMPLE[0].genotypes.bcf";
             $tgt = "$outputVCFFile.OK";
             $dep = join(" ", map {"$individualDir/$SAMPLE[0]/$_.genotypes.bcf.OK"} @intervalNames);
             @cmd = ("$vt cat -L $inputVCFFileList -o $outputVCFFile");
             makeJob($partition, $tgt, $dep, @cmd);
             
-            $inputVCFFile = "$intermediateDir/$SAMPLE[0].genotypes.bcf";
+            $inputVCFFile = "$evaluationDir/$SAMPLE[0].genotypes.bcf";
             $tgt = "$inputVCFFile.csi.OK";
             $dep = "$inputVCFFile.OK";
             @cmd = ("$vt index $inputVCFFile");
             makeJob($partition, $tgt, $dep, @cmd);
             
-            $inputVCFFile = "$intermediateDir/$SAMPLE[0].genotypes.bcf";
-            my $outputFile = "$intermediateDir/profile_na12878.snps.txt";
+            $inputVCFFile = "$evaluationDir/$SAMPLE[0].genotypes.bcf";
+            my $outputFile = "$evaluationDir/profile_na12878.snps.txt";
             $tgt = "$outputFile.OK";
             $dep = "$inputVCFFile.csi.OK";
             @cmd = ("$vt profile_na12878 $inputVCFFile -g /net/fantasia/home/atks/ref/vt/grch37/NA12878.snps.reference.txt  -r ~/ref/genome/hs37d5.fa  -f \"VTYPE==SNP\" 2> $outputFile");
             makeJob($partition, $tgt, $dep, @cmd);
             
-            $inputVCFFile = "$intermediateDir/$SAMPLE[0].genotypes.bcf";
-            $outputFile = "$intermediateDir/profile_na12878.indels.txt";
+            $inputVCFFile = "$evaluationDir/$SAMPLE[0].genotypes.bcf";
+            $outputFile = "$evaluationDir/profile_na12878.indels.txt";
             $tgt = "$outputFile.OK";
             $dep = "$inputVCFFile.csi.OK";
             @cmd = ("$vt profile_na12878 $inputVCFFile -g /net/fantasia/home/atks/ref/vt/grch37/NA12878.indels.reference.txt  -r ~/ref/genome/hs37d5.fa  -f \"VTYPE==INDEL\" 2> $outputFile");
@@ -449,27 +449,27 @@ if ($generateIntermediateFiles)
             for my $intervalName (@intervalNames) {print OUT "$individualDir/$SAMPLE[0]/$intervalName.genotypes.bcf\n"; }
             close(OUT);
             
-            $outputVCFFile = "$intermediateDir/$CHROM[0].$SAMPLE[0].genotypes.bcf";
+            $outputVCFFile = "$evaluationDir/$CHROM[0].$SAMPLE[0].genotypes.bcf";
             $tgt = "$outputVCFFile.OK";
             $dep = join(" ", map {"$individualDir/$SAMPLE[0]/$_.genotypes.bcf.OK"} @intervalNames);
             @cmd = ("$vt cat -L $inputVCFFileList -o $outputVCFFile");
             makeJob($partition, $tgt, $dep, @cmd);
             
-            $inputVCFFile = "$intermediateDir/$CHROM[0].$SAMPLE[0].genotypes.bcf";
+            $inputVCFFile = "$evaluationDir/$CHROM[0].$SAMPLE[0].genotypes.bcf";
             $tgt = "$inputVCFFile.csi.OK";
             $dep = "$inputVCFFile.OK";
             @cmd = ("$vt index $inputVCFFile");
             makeJob($partition, $tgt, $dep, @cmd);
             
-            $inputVCFFile = "$intermediateDir/$CHROM[0].$SAMPLE[0].genotypes.bcf";
-            my $outputFile = "$intermediateDir/$CHROM[0].profile_na12878.snps.txt";
+            $inputVCFFile = "$evaluationDir/$CHROM[0].$SAMPLE[0].genotypes.bcf";
+            my $outputFile = "$evaluationDir/$CHROM[0].profile_na12878.snps.txt";
             $tgt = "$outputFile.OK";
             $dep = "$inputVCFFile.csi.OK";
             @cmd = ("$vt profile_na12878 $inputVCFFile -g /net/fantasia/home/atks/ref/vt/grch37/NA12878.snps.reference.txt  -r ~/ref/genome/hs37d5.fa -i $CHROM[0] -f \"VTYPE==SNP\" 2> $outputFile");
             makeJob($partition, $tgt, $dep, @cmd);
             
-            $inputVCFFile = "$intermediateDir/$CHROM[0].$SAMPLE[0].genotypes.bcf";
-            $outputFile = "$intermediateDir/$CHROM[0].profile_na12878.indels.txt";
+            $inputVCFFile = "$evaluationDir/$CHROM[0].$SAMPLE[0].genotypes.bcf";
+            $outputFile = "$evaluationDir/$CHROM[0].profile_na12878.indels.txt";
             $tgt = "$outputFile.OK";
             $dep = "$inputVCFFile.csi.OK";
             @cmd = ("$vt profile_na12878 $inputVCFFile -g /net/fantasia/home/atks/ref/vt/grch37/NA12878.indels.reference.txt  -r ~/ref/genome/hs37d5.fa -i $CHROM[0] -f \"VTYPE==INDEL\"  2> $outputFile");
