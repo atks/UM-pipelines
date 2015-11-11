@@ -258,8 +258,8 @@ SCRIPT
             $outputVCFFile = "$individualDir/$sampleID/$intervalNames[$i].sites.bcf";
             $tgt = "$outputVCFFile.OK";
             $dep = "$logDir/start.discovery.OK";
-            #@cmd = ("$samtools view -h $BAMFILE{$sampleID} $intervals[$i] -u | $bam clipoverlap --in -.ubam --out -.ubam | $vt discover2 -z -q 20 -b + -r $refGenomeFASTAFile -s $sampleID -i $intervals[$i] -o $outputVCFFile 2> $individualDir/$sampleID/$intervalNames[$i].discover2.log");
-            @cmd = ("$vt discover2 -q 13 -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -i $intervals[$i] -o $outputVCFFile 2> $individualDir/$sampleID/$intervalNames[$i].discover2.log");
+            @cmd = ("$samtools view -h $BAMFILE{$sampleID} $intervals[$i] -u | $bam clipoverlap --in -.ubam --out -.ubam | $vt discover2 -z -q 20 -b + -r $refGenomeFASTAFile -s $sampleID -i $intervals[$i] -o $outputVCFFile 2> $individualDir/$sampleID/$intervalNames[$i].discover2.log");
+            #@cmd = ("$vt discover2 -q 13 -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -i $intervals[$i] -o $outputVCFFile 2> $individualDir/$sampleID/$intervalNames[$i].discover2.log");
             makeJob($partition, $tgt, $dep, @cmd);
             
             #print SCRIPT "commands[" . ++$no . "]= [ ! -e $outputVCFFile.OK ] && $slurmScriptsDir/$slurmScriptNo.sh && touch $outputVCFFile.OK;\n";
@@ -288,6 +288,12 @@ SCRIPT
         @cmd = ("$vt merge_candidate_variants2 -L $inputVCFFileList -o + 2> $unionDir/$intervalNames[$i].merge_candidate_variants.log | " .
                 "$vt annotate_indels -r $refGenomeFASTAFile + -o + 2> $unionDir/$intervalNames[$i].annotate_indels.log | " .
                 "$vt consolidate_variants + -o $outputVCFFile 2> $unionDir/$intervalNames[$i].consolidate_variants.log");
+        makeJob($partition, $tgt, $dep, @cmd);
+        
+        $inputVCFFile = "$unionDir/$intervalNames[$i].sites.bcf";
+        $tgt = "$inputVCFFile.csi.OK";
+        $dep = "$inputVCFFile.OK";
+        @cmd = ("$vt index $inputVCFFile");
         makeJob($partition, $tgt, $dep, @cmd);
     }
 
@@ -345,9 +351,9 @@ SCRIPT
     makeJob("local", $tgt, $dep, @cmd);
 }
 
-###############
-##2. Genotyping
-###############
+##############
+#2. Genotyping
+##############
 
 if ($processByGenome)
 {
@@ -376,8 +382,8 @@ else
             $tgt = "$outputVCFFile.OK";
             $dep = "$inputVCFFile.OK";
             @cmd = ("$vt genotype2 $inputVCFFile -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -i $intervals[$i] -o $outputVCFFile 2> $individualDir/$sampleID/$intervalNames[$i].genotype2.log");
-#            @cmd = ("[ ! -e $logDir/start.genotyping.OK ] && touch $logDir/start.genotyping.OK && date | awk '{print \"start genotyping: \"\$\$0}' >> $logFile\n" .
-#                    "\t$vt genotype2 $inputVCFFile -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -i $intervals[$i] -o $outputVCFFile 2> $individualDir/$sampleID/$intervalNames[$i].genotype2.log");
+            @cmd = ("[ ! -e $logDir/start.genotyping.OK ] && touch $logDir/start.genotyping.OK && date | awk '{print \"start genotyping: \"\$\$0}' >> $logFile\n" .
+                    "\t$vt genotype2 $inputVCFFile -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -i $intervals[$i] -o $outputVCFFile 2> $individualDir/$sampleID/$intervalNames[$i].genotype2.log");
             makeJob($partition, $tgt, $dep, @cmd);
 
             $inputVCFFile = "$individualDir/$sampleID/$intervalNames[$i].genotypes.bcf";
@@ -536,7 +542,7 @@ sub makeSlurm
             my $slurmScriptFile = "$slurmScriptsDir/$slurmScriptNo.sh";
             open(IN, ">$slurmScriptFile");
             print IN "#!/bin/bash\n";
-            print IN "set pipefail; $c";
+            print IN "set -o pipefail; $c";
             close(IN);
             chmod(0755, $slurmScriptFile);
 
@@ -562,7 +568,7 @@ sub makeLocalStep
     my $cmd = "";
     for my $c (@cmd)
     {
-        $cmd .= "\tset pipefail; " . $c . "\n";
+        $cmd .= "\tset -o pipefail; " . $c . "\n";
     }
     $cmd .= "\ttouch $tgt\n";
     push(@cmds, $cmd);
