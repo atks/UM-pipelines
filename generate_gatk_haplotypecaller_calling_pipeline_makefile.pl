@@ -34,6 +34,7 @@ This script generates the make file to discovery and genotype a set of individua
 my $help;
 
 my $outputDir = "";
+my $slurmScriptsSubDir = "";
 my $vtDir = "";
 my $makeFile = "Makefile";
 my $partition = "1000g";
@@ -50,6 +51,7 @@ Getopt::Long::Configure ('bundling');
 
 if(!GetOptions ('h'=>\$help,
                 'o:s'=>\$outputDir,
+                'd:s'=>\$slurmScriptsSubDir,
                 'm:s'=>\$makeFile,
                 'p:s'=>\$partition,
                 's:s'=>\$sampleFile,
@@ -81,16 +83,16 @@ my $vt = "/net/fantasia/home/atks/dev/vt/comparisons/programs/vt/vt";
 
 printf("generate_gatk_haplotypecaller_pipeline_makefile.pl\n");
 printf("\n");
-printf("options: output dir           %s\n", $outputDir);
-printf("         vt path              %s\n", $vt);
-printf("         make file            %s\n", $makeFile);
-printf("         partition            %s\n", $partition);
-printf("         sample file          %s\n", $sampleFile);
-printf("         sequence length file %s\n", $sequenceLengthFile);
-printf("         interval width       %s\n", $intervalWidth);
-printf("         reference            %s\n", $refGenomeFASTAFile);
-printf("         JVM Memory           %s\n", $jvmMemory);
-printf("         raw Copy             %s\n", $rawCopy);
+printf("options: output dir              %s\n", $outputDir);
+printf("         make file               %s\n", $makeFile);
+printf("         partition               %s\n", $partition);
+printf("         slurm scripts sub dir   %s\n", $slurmScriptsSubDir);
+printf("         sample file             %s\n", $sampleFile);
+printf("         sequence length file    %s\n", $sequenceLengthFile);
+printf("         interval width          %s\n", $intervalWidth);
+printf("         reference               %s\n", $refGenomeFASTAFile);
+printf("         JVM Memory              %s\n", $jvmMemory);
+printf("         raw Copy                %s\n", $rawCopy);
 printf("\n");
 
 my $vcfOutDir = "$outputDir/vcf";
@@ -103,6 +105,8 @@ my $auxDir = "$outputDir/aux";
 mkpath($auxDir);
 my $statsDir = "$outputDir/stats";
 mkpath($statsDir);
+my $slurmScriptsDir = "$outputDir/slurm_scripts/$slurmScriptsSubDir";
+mkpath($slurmScriptsDir);
 my $rawCopyDir = "$outputDir/raw";
 if ($rawCopy)
 {
