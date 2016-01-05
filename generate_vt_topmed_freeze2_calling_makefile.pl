@@ -86,6 +86,9 @@ if(!GetOptions ('h'=>\$help,
 #programs
 my $vt = "/net/fantasia/home/atks/programs/vt_topmed_freeze2/vt";
 my $samtools = "/net/fantasia/home/atks/programs/samtools/samtools";
+#my $samtools = "/net/wonderland/home/mktrost/otherTools/samtools-1.2/samtools-1.2/samtools";
+#my $samtools = /home/software/rhel6/med/samtools/1.2/bin/samtools
+
 my $bam = "/usr/cluster/bin/bam";
 
 printf("generate_vt_topmed_freeze2_calling.pl\n");
@@ -218,7 +221,7 @@ if ($processByGenome)
         $outputVCFFile = "$individualDir/$sampleID/all.sites.bcf";
         $tgt = "$outputVCFFile.OK";
         $dep = "";
-        @cmd = ("$samtools view -h $BAMFILE{$sampleID} -u | $bam clipoverlap --in -.ubam --out -.ubam | $vt discover2 -z -q 20 -b + -r $refGenomeFASTAFile -s $sampleID -o $outputVCFFile 2> $individualDir/$sampleID/all.discover2.log");
+        @cmd = ("$samtools view -h $BAMFILE{$sampleID} -u | $bam clipoverlap --poolSize 10000000 --in -.ubam --out -.ubam | $vt discover2 -z -q 20 -b + -r $refGenomeFASTAFile -s $sampleID -o $outputVCFFile 2> $individualDir/$sampleID/all.discover2.log");
         #@cmd = ("$vt discover -z -q 20 -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -I $intervalFiles[$i] -o $outputVCFFile 2> $individualDir/$sampleID/$intervals[$i].discover2.log");
         makeJob($partition, $tgt, $dep, @cmd);
     }
@@ -261,7 +264,7 @@ SCRIPT
             $outputVCFFile = "$individualDir/$sampleID/$intervalNames[$i].sites.bcf";
             $tgt = "$outputVCFFile.OK";
             $dep = "$logDir/start.discovery.OK";
-            @cmd = ("REF_PATH=/dept/csg/topmed/working/mktrost/gotcloud.ref/md5/%2s/%2s/%s; $samtools view -h $BAMFILE{$sampleID} $intervals[$i] -u | $bam clipoverlap --in -.ubam --out -.ubam | $vt discover2 -z -q 20 -b + -r $refGenomeFASTAFile -s $sampleID -i $intervals[$i] -o $outputVCFFile 2> $individualDir/$sampleID/$intervalNames[$i].discover2.log");
+            @cmd = ("REF_PATH=/dept/csg/topmed/working/mktrost/gotcloud.ref/md5/%2s/%2s/%s; $samtools view -h $BAMFILE{$sampleID} $intervals[$i] -u | $bam clipoverlap --poolSize 100000000 --in -.ubam --out -.ubam | $vt discover2 -z -q 20 -b + -r $refGenomeFASTAFile -s $sampleID -i $intervals[$i] -o $outputVCFFile 2> $individualDir/$sampleID/$intervalNames[$i].discover2.log");
             makeJob($partition, $tgt, $dep, @cmd);
             #print SCRIPT "commands[" . ++$no . "]= [ ! -e $outputVCFFile.OK ] && $slurmScriptsDir/$slurmScriptNo.sh && touch $outputVCFFile.OK;\n";
             print SCRIPT "commands[" . ++$no . "]= $slurmScriptsDir/$slurmScriptNo.sh && touch $outputVCFFile.OK;\n";
@@ -382,9 +385,7 @@ else
             $outputVCFFile = "$individualDir/$sampleID/$intervalNames[$i].genotypes.bcf";
             $tgt = "$outputVCFFile.OK";
             $dep = "$inputVCFFile.OK";
-            @cmd = ("$vt genotype2 $inputVCFFile -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -i $intervals[$i] -o $outputVCFFile 2> $individualDir/$sampleID/$intervalNames[$i].genotype2.log");
-            @cmd = ("[ ! -e $logDir/start.genotyping.OK ] && touch $logDir/start.genotyping.OK && date | awk '{print \"start genotyping: \"\$\$0}' >> $logFile\n" .
-                    "\t$vt genotype2 $inputVCFFile -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -i $intervals[$i] -o $outputVCFFile 2> $individualDir/$sampleID/$intervalNames[$i].genotype2.log");
+            @cmd = ("REF_PATH=/dept/csg/topmed/working/mktrost/gotcloud.ref/md5/%2s/%2s/%s; $vt genotype2 $inputVCFFile -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -i $intervals[$i] -o $outputVCFFile 2> $individualDir/$sampleID/$intervalNames[$i].genotype2.log");
             makeJob($partition, $tgt, $dep, @cmd);
 
             $inputVCFFile = "$individualDir/$sampleID/$intervalNames[$i].genotypes.bcf";
