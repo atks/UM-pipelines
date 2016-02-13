@@ -1,0 +1,190 @@
+#!/usr/bin/perl
+
+use warnings;
+use strict;
+use fralib;
+use POSIX qw(ceil floor);
+use File::Basename;
+use File::Path;
+use Getopt::Long;
+use Pod::Usage;
+
+=head1 NAME
+
+cat_trf_dat_files
+
+=head1 SYNOPSIS
+
+cat_trf_dat_files [options] <filename>
+
+    -v  verbose
+    -d  debug
+    -o  output contig directory.
+
+    usage: cat_trf_dat_files a.dat b.dat  -o output.vcf
+    
+    Concatenates Tandem Repeat Finder dat files into a VCF file.
+
+=head1 DESCRIPTION
+
+=cut
+
+#option variables
+my $help;
+my $outputVCFFile;
+
+#initialize options
+Getopt::Long::Configure ('bundling');
+
+if(!GetOptions ('o=s'=>\$outputVCFFile)
+    || !defined($outputVCFFile) || scalar(@ARGV)==0)
+{
+    if ($help)
+    {
+        pod2usage(-verbose => 2);
+    }
+    else
+    {
+        pod2usage(1);
+    }
+}
+
+my @files = @ARGV;
+
+if ($outputVCFFile =~ /\.vcf\.gz/)
+{
+    open(OUT, "| bgzip -c >$outputVCFFile") || die "Cannot open $outputVCFFile";
+}
+else
+{
+    open(OUT, ">$outputVCFFile") || die "Cannot open $outputVCFFile";
+}
+
+print OUT "##fileformat=VCFv4.1\n";
+print OUT "##FILTER=<ID=PASS,Description=\"All filters passed\">\n";
+print OUT "##INFO=<ID=END,Number=1,Type=Integer,Description=\"End position\">\n";
+print OUT "##INFO=<ID=PS,Number=1,Type=Integer,Description=\"Period Size\">\n";
+print OUT "##INFO=<ID=CN,Number=1,Type=Float,Description=\"Copy Number\">\n";
+print OUT "##INFO=<ID=CS,Number=1,Type=Integer,Description=\"Consensus Size\">\n";
+print OUT "##INFO=<ID=PM,Number=1,Type=Integer,Description=\"Percent Matches\">\n";
+print OUT "##INFO=<ID=PI,Number=1,Type=Integer,Description=\"Percent of Indels\">\n";
+print OUT "##INFO=<ID=SCORE,Number=1,Type=Integer,Description=\"Score\">\n";
+print OUT "##INFO=<ID=A,Number=1,Type=Integer,Description=\"A content (%)\">\n";
+print OUT "##INFO=<ID=C,Number=1,Type=Integer,Description=\"C content (%)\">\n";
+print OUT "##INFO=<ID=G,Number=1,Type=Integer,Description=\"G content (%)\">\n";
+print OUT "##INFO=<ID=T,Number=1,Type=Integer,Description=\"T content (%)\">\n";
+print OUT "##INFO=<ID=ENT,Number=1,Type=Float,Description=\"Entropy (0-2)\">\n";
+print OUT "##INFO=<ID=RU,Number=1,Type=String,Description=\"Consensus Repeat Unit\">\n";
+print OUT "##contig=<ID=1,length=249250621>\n";
+print OUT "##contig=<ID=2,length=243199373>\n";
+print OUT "##contig=<ID=3,length=198022430>\n";
+print OUT "##contig=<ID=4,length=191154276>\n";
+print OUT "##contig=<ID=5,length=180915260>\n";
+print OUT "##contig=<ID=6,length=171115067>\n";
+print OUT "##contig=<ID=7,length=159138663>\n";
+print OUT "##contig=<ID=8,length=146364022>\n";
+print OUT "##contig=<ID=9,length=141213431>\n";
+print OUT "##contig=<ID=10,length=135534747>\n";
+print OUT "##contig=<ID=11,length=135006516>\n";
+print OUT "##contig=<ID=12,length=133851895>\n";
+print OUT "##contig=<ID=13,length=115169878>\n";
+print OUT "##contig=<ID=14,length=107349540>\n";
+print OUT "##contig=<ID=15,length=102531392>\n";
+print OUT "##contig=<ID=16,length=90354753>\n";
+print OUT "##contig=<ID=17,length=81195210>\n";
+print OUT "##contig=<ID=18,length=78077248>\n";
+print OUT "##contig=<ID=19,length=59128983>\n";
+print OUT "##contig=<ID=20,length=63025520>\n";
+print OUT "##contig=<ID=21,length=48129895>\n";
+print OUT "##contig=<ID=22,length=51304566>\n";
+print OUT "##contig=<ID=X,length=155270560>\n";
+print OUT "##contig=<ID=Y,length=59373566>\n";
+print OUT "##contig=<ID=MT,length=16569>\n";
+print OUT "##contig=<ID=GL000207.1,length=4262>\n";
+print OUT "##contig=<ID=GL000226.1,length=15008>\n";
+print OUT "##contig=<ID=GL000229.1,length=19913>\n";
+print OUT "##contig=<ID=GL000231.1,length=27386>\n";
+print OUT "##contig=<ID=GL000210.1,length=27682>\n";
+print OUT "##contig=<ID=GL000239.1,length=33824>\n";
+print OUT "##contig=<ID=GL000235.1,length=34474>\n";
+print OUT "##contig=<ID=GL000201.1,length=36148>\n";
+print OUT "##contig=<ID=GL000247.1,length=36422>\n";
+print OUT "##contig=<ID=GL000245.1,length=36651>\n";
+print OUT "##contig=<ID=GL000197.1,length=37175>\n";
+print OUT "##contig=<ID=GL000203.1,length=37498>\n";
+print OUT "##contig=<ID=GL000246.1,length=38154>\n";
+print OUT "##contig=<ID=GL000249.1,length=38502>\n";
+print OUT "##contig=<ID=GL000196.1,length=38914>\n";
+print OUT "##contig=<ID=GL000248.1,length=39786>\n";
+print OUT "##contig=<ID=GL000244.1,length=39929>\n";
+print OUT "##contig=<ID=GL000238.1,length=39939>\n";
+print OUT "##contig=<ID=GL000202.1,length=40103>\n";
+print OUT "##contig=<ID=GL000234.1,length=40531>\n";
+print OUT "##contig=<ID=GL000232.1,length=40652>\n";
+print OUT "##contig=<ID=GL000206.1,length=41001>\n";
+print OUT "##contig=<ID=GL000240.1,length=41933>\n";
+print OUT "##contig=<ID=GL000236.1,length=41934>\n";
+print OUT "##contig=<ID=GL000241.1,length=42152>\n";
+print OUT "##contig=<ID=GL000243.1,length=43341>\n";
+print OUT "##contig=<ID=GL000242.1,length=43523>\n";
+print OUT "##contig=<ID=GL000230.1,length=43691>\n";
+print OUT "##contig=<ID=GL000237.1,length=45867>\n";
+print OUT "##contig=<ID=GL000233.1,length=45941>\n";
+print OUT "##contig=<ID=GL000204.1,length=81310>\n";
+print OUT "##contig=<ID=GL000198.1,length=90085>\n";
+print OUT "##contig=<ID=GL000208.1,length=92689>\n";
+print OUT "##contig=<ID=GL000191.1,length=106433>\n";
+print OUT "##contig=<ID=GL000227.1,length=128374>\n";
+print OUT "##contig=<ID=GL000228.1,length=129120>\n";
+print OUT "##contig=<ID=GL000214.1,length=137718>\n";
+print OUT "##contig=<ID=GL000221.1,length=155397>\n";
+print OUT "##contig=<ID=GL000209.1,length=159169>\n";
+print OUT "##contig=<ID=GL000218.1,length=161147>\n";
+print OUT "##contig=<ID=GL000220.1,length=161802>\n";
+print OUT "##contig=<ID=GL000213.1,length=164239>\n";
+print OUT "##contig=<ID=GL000211.1,length=166566>\n";
+print OUT "##contig=<ID=GL000199.1,length=169874>\n";
+print OUT "##contig=<ID=GL000217.1,length=172149>\n";
+print OUT "##contig=<ID=GL000216.1,length=172294>\n";
+print OUT "##contig=<ID=GL000215.1,length=172545>\n";
+print OUT "##contig=<ID=GL000205.1,length=174588>\n";
+print OUT "##contig=<ID=GL000219.1,length=179198>\n";
+print OUT "##contig=<ID=GL000224.1,length=179693>\n";
+print OUT "##contig=<ID=GL000223.1,length=180455>\n";
+print OUT "##contig=<ID=GL000195.1,length=182896>\n";
+print OUT "##contig=<ID=GL000212.1,length=186858>\n";
+print OUT "##contig=<ID=GL000222.1,length=186861>\n";
+print OUT "##contig=<ID=GL000200.1,length=187035>\n";
+print OUT "##contig=<ID=GL000193.1,length=189789>\n";
+print OUT "##contig=<ID=GL000194.1,length=191469>\n";
+print OUT "##contig=<ID=GL000225.1,length=211173>\n";
+print OUT "##contig=<ID=GL000192.1,length=547496>\n";
+print OUT "##contig=<ID=NC_007605,length=171823>\n";
+print OUT "##contig=<ID=hs37d5,length=35477943>\n";
+print OUT "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n";
+
+for my $file (@files)
+{
+    $file =~ /\/([^.\/]+)\.fa/;
+    
+    my $chrom = $1;
+    
+    open(IN, "$file") || die "Cannot open $file";
+    
+    print STDERR "processing $chrom\n";
+    
+    while (<IN>)
+    {
+        if (/^\d/)
+        {
+            my ($start, $end, $ps, $cn, $cs, $pm, $pi, $score, $a, $c, $g, $t, $entropy, $ru, $ref) = split(" ");
+         
+            print OUT "$chrom\t$start\t.\t$ref\t.\t.\t.\tEND=$end;PS=$ps;CN=$cn;CS=$cs;PM=$pm;PI=$pi;SCORE=$score;A=$a;C=$c;G=$g;T=$t;ENT=$entropy;RU=$ru;\n";   
+        }
+    }
+    
+    close(IN);
+}
+
+close(OUT);
+ 

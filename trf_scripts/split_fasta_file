@@ -1,0 +1,80 @@
+#!/usr/bin/perl
+
+use warnings;
+use strict;
+use fralib;
+use POSIX qw(ceil floor);
+use File::Basename;
+use File::Path;
+use Getopt::Long;
+use Pod::Usage;
+
+=head1 NAME
+
+split_fasta_file
+
+=head1 SYNOPSIS
+
+split_fasta_file [options] <filename>
+
+    -v  verbose
+    -d  debug
+    -o  output contig directory.
+
+    usage: split_fasta_file hs37d5.fa -o output/hs37d5_
+
+    Splits .
+
+=head1 DESCRIPTION
+
+=cut
+
+#option variables
+my $help;
+my $outputDir;
+
+#initialize options
+Getopt::Long::Configure ('bundling');
+
+if(!GetOptions ('o=s'=>\$outputDir)
+    || !defined($outputDir) || scalar(@ARGV)==0)
+{
+    if ($help)
+    {
+        pod2usage(-verbose => 2);
+    }
+    else
+    {
+        pod2usage(1);
+    }
+}
+
+mkpath($outputDir);
+
+my $file = $ARGV[0];
+open(IN, $file) || die "Cannot open $file\n";
+while (<IN>)
+{
+    if (/>/)
+    {
+        />(\S+)/;
+
+        my $outputFile = "$outputDir/$1.fa";
+
+        if ($.!=1)
+        {
+            close(OUT);
+        }
+
+        print STDERR "processing $outputFile\n";
+        
+        open(OUT, ">$outputFile") || die "Cannot open $outputFile";
+    }
+
+    print OUT $_;
+}
+
+close(OUT);
+close(IN);
+
+
