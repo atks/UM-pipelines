@@ -471,7 +471,7 @@ if ($intervalWidth!=0)
     $dep = "$inputVCFFileIndicesOK";
     @cmd = ("date | awk '{print \"end concatenation and normalization: \"\$\$0}' >> $logFile");
     makeJob("local", $tgt, $dep, @cmd);
-    
+
     if ($rawCopy)
     {
         for my $chrom (@CHROM)
@@ -532,7 +532,7 @@ else
     $outputVCFFile = "$finalVCFOutDir/all.genotypes.vcf.gz";
     $tgt = "$outputVCFFile.OK";
     $dep = "$logDir/start.normalization.OK";
-    @cmd = ("$vt normalize -r $refGenomeFASTAFile $inputVCFFile -o + 2> $statsDir/all.normalize.log | $vt uniq + -o $outputVCFFile 2> $statsDir/all.uniq.log");
+    @cmd = ("$vt normalize -n -r $refGenomeFASTAFile $inputVCFFile -o + 2> $statsDir/all.normalize.log | $vt uniq + -o $outputVCFFile 2> $statsDir/all.uniq.log");
     makeJob($partition, $tgt, $dep, @cmd);
 
     #********************************
