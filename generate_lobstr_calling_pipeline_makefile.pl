@@ -363,30 +363,57 @@ close MAK;
 ##########
 #Functions
 ##########
-sub makeMos
-{
-    my $cmd = shift;
 
-    if ($cluster eq "main")
+#run a job either locally or by slurm
+sub makeJob
+{
+    my ($method, $tgt, $dep, @cmd) = @_;
+
+    if ($method eq "local")
     {
-        return ("mosbatch -E/tmp -i -r`$clusterDir/pick_main_node $sleep` /bin/bash -c 'set pipefail; $cmd'");
-    }
-    elsif ($cluster eq "mini")
-    {
-        return ("mosbatch -E/tmp -i -r`$clusterDir/pick_mini_node $sleep` /bin/bash -c 'set pipefail; $cmd'");
-    }
-    elsif ($cluster eq "mini+")
-    {
-        return ("mosbatch -E/tmp -i -r`$clusterDir/pick_mini+_node $sleep` /bin/bash -c 'set pipefail; $cmd'");
+        makeLocalStep($tgt, $dep, @cmd);
     }
     else
     {
-        print STDERR "$cluster not supported\n";
-        exit(1);
+        makeSlurm($partition, $tgt, $dep, @cmd);
     }
 }
 
-sub makeStep
+#run slurm jobs
+sub makeSlurm
+{
+    my ($partition, $tgt, $dep, @cmd) = @_;
+
+    push(@tgts, $tgt);
+    push(@deps, $dep);
+    my $cmd = "";
+    for my $c (@cmd)
+    {
+        #contains pipe
+        if ($c=~/\|/)
+        {
+            ++$slurmScriptNo;
+            my $slurmScriptFile = "$slurmScriptsDir/$slurmScriptNo.sh";
+            open(IN, ">$slurmScriptFile");
+            print IN "#!/bin/bash\n";
+            print IN "set -o pipefail; $c";
+            close(IN);
+            chmod(0755, $slurmScriptFile);
+
+            $cmd .= "\techo '" . $c . "'\n";
+            $cmd .= "\tsrun -p $partition $slurmScriptFile\n";
+        }
+        else
+        {
+            $cmd .= "\tsrun -p $partition " . $c . "\n";
+        }
+    }
+    $cmd .= "\ttouch $tgt\n";
+    push(@cmds, $cmd);
+}
+
+#run a local job
+sub makeLocalStep
 {
     my ($tgt, $dep, @cmd) = @_;
 
@@ -395,13 +422,14 @@ sub makeStep
     my $cmd = "";
     for my $c (@cmd)
     {
-        $cmd .= "\t" . makeMos($c) . "\n";
+        $cmd .= "\tset -o pipefail; " . $c . "\n";
     }
     $cmd .= "\ttouch $tgt\n";
     push(@cmds, $cmd);
 }
 
-sub makeLocalStep
+#run a local phony job
+sub makePhonyJob
 {
     my ($tgt, $dep, @cmd) = @_;
 
@@ -412,6 +440,5 @@ sub makeLocalStep
     {
         $cmd .= "\t" . $c . "\n";
     }
-    $cmd .= "\ttouch $tgt\n";
     push(@cmds, $cmd);
 }

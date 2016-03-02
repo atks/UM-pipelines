@@ -35,18 +35,14 @@ my $help;
 
 my $workDir = "";
 my $outputDir = "run";
-my $vtDir = "";
-my $clusterDir = "";
 my $makeFile = "Makefile";
-my $cluster = "main";
+my $partition = "local";
 my $sleep = 0;
 my $sampleFile = "";
 my $intervals = "";
-my $sequenceLengthFile = "/net/fantasia/home/atks/dev/vt/pipeline/seq_length.txt";
 my $intervalWidth = 1000000;
 my $refGenomeFASTAFile = "";
 my $jvmMemory = "2g";
-my $variantType = "BOTH";
 
 #initialize options
 Getopt::Long::Configure ('bundling');
@@ -54,13 +50,10 @@ Getopt::Long::Configure ('bundling');
 if(!GetOptions ('h'=>\$help,
                 'w:s'=>\$workDir,
                 'o:s'=>\$outputDir,
-                'b:s'=>\$vtDir,
-                't:s'=>\$clusterDir,
                 'm:s'=>\$makeFile,
-                'c:s'=>\$cluster,
+                'p:s'=>\$partition,
                 'd:s'=>\$sleep,
                 's:s'=>\$sampleFile,
-                'l:s'=>\$sequenceLengthFile,
                 'i:s'=>\$intervalWidth,
                 'r:s'=>\$refGenomeFASTAFile
                 )
@@ -82,19 +75,15 @@ if(!GetOptions ('h'=>\$help,
 #programs
 #you can set the  maximum memory here to be whatever you want
 my $freebayes = "/net/fantasia/home/atks/dev/vt/comparisons/programs/freebayes/bin/freebayes";
-my $vt = "$vtDir/vt";
+my $vt = "/net/fantasia/home/atks/dev/vt/comparisons/programs/vt/vt";
 
 printf("generate_freebayes_calling_pipeline_makefile.pl\n");
 printf("\n");
 printf("options: work dir             %s\n", $workDir);
 printf("         out dir              %s\n", $outputDir);
 printf("         vt path              %s\n", $vt);
-printf("         cluster path         %s\n", $clusterDir);
 printf("         make file            %s\n", $makeFile);
-printf("         cluster              %s\n", $cluster);
-printf("         sleep                %s\n", $sleep);
 printf("         sample file          %s\n", $sampleFile);
-printf("         sequence length file %s\n", $sequenceLengthFile);
 printf("         interval width       %s\n", $intervalWidth);
 printf("         reference            %s\n", $refGenomeFASTAFile);
 printf("\n");
@@ -145,14 +134,16 @@ my @intervalNames = ();
 my @intervalFiles = ();
 my @CHROM = ();
 
-open(SQ,"$sequenceLengthFile") || die "Cannot open $sequenceLengthFile\n";
+open(SQ,"$refGenomeFASTAFile.fai") || die "Cannot open $refGenomeFASTAFile.fai\n";
 while (<SQ>)
 {
     s/\r?\n?$//;
     if(!/^#/)
     {
-        my ($chrom, $len) = split('\t', $_);
+        my ($chrom, $len, $offset, $others) = split('\t', $_);
 
+        last if ($chrom=~/^GL/);
+            
         print "processing $chrom\t$len ";
 
         push(@CHROM, $chrom);
@@ -222,7 +213,7 @@ if ($intervalWidth!=0)
         $tgt = "$outputVCFFile.OK";
         $dep = "";
         @cmd = ("$freebayes -f $refGenomeFASTAFile -L $bamListFile -r $intervals[$i] -v $outputVCFFile"),
-        makeStep($tgt, $dep, @cmd);
+        makeJob($partition, $tgt, $dep, @cmd);
 
         $intervalVCFFilesOK .= " $outputVCFFile.OK";
     }
@@ -241,7 +232,7 @@ else
     $tgt = "$outputVCFFile.OK";
     $dep = "";
     @cmd = ("$freebayes -f $refGenomeFASTAFile -L $bamListFile -v $outputVCFFile");
-    makeStep($tgt, $dep, @cmd);
+    makeJob($partition, $tgt, $dep, @cmd);
 
     #************
     #log end time
@@ -286,13 +277,13 @@ if ($intervalWidth!=0)
         $tgt = "$outputVCFFile.OK";
         $dep = "$logDir/end.calling.OK";
         @cmd = ("$vt concat $inputChromosomeIntervalVCFFiles -o + | $vt normalize + -o + -r $refGenomeFASTAFile 2> $statsDir/$chrom.normalize.log | $vt uniq + -o $outputVCFFile 2> $statsDir/$chrom.uniq.log");
-        makeStep($tgt, $dep, @cmd);
+        makeJob($partition, $tgt, $dep, @cmd);
 
         $inputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
         $tgt = "$inputVCFFile.tbi.OK";
         $dep = "$inputVCFFile.OK";
         @cmd = ("$vt index $inputVCFFile");
-        makeStep($tgt, $dep, @cmd);
+        makeJob($partition, $tgt, $dep, @cmd);
 
         #sites VCFs
         $inputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
@@ -300,26 +291,26 @@ if ($intervalWidth!=0)
         $tgt = "$outputVCFFile.OK";
         $dep = "$inputVCFFile.OK";
         @cmd = ("$vt view -s $inputVCFFile -o $outputVCFFile");
-        makeStep($tgt, $dep, @cmd);
+        makeJob($partition, $tgt, $dep, @cmd);
 
         $inputVCFFile = "$finalVCFOutDir/$chrom.sites.vcf.gz";
         $tgt = "$inputVCFFile.tbi.OK";
         $dep = "$inputVCFFile.OK";
         @cmd = ("$vt index $inputVCFFile");
-        makeStep($tgt, $dep, @cmd);
+        makeJob($partition, $tgt, $dep, @cmd);
     }
 
     $outputVCFFile = "$finalVCFOutDir/all.sites.vcf.gz";
     $tgt = "$outputVCFFile.OK";
     $dep = "$chromSiteVCFFilesOK";
     @cmd = ("$vt concat $chromSiteVCFFiles -o $outputVCFFile");
-    makeStep($tgt, $dep, @cmd);
+    makeJob($partition, $tgt, $dep, @cmd);
 
     $inputVCFFile = "$finalVCFOutDir/all.sites.vcf.gz";
     $tgt = "$inputVCFFile.tbi.OK";
     $dep = "$inputVCFFile.OK";
     @cmd = ("$vt index $inputVCFFile");
-    makeStep($tgt, $dep, @cmd);
+    makeJob($partition, $tgt, $dep, @cmd);
 
     #************
     #log end time
@@ -344,26 +335,26 @@ else
     $tgt = "$outputVCFFile.OK";
     $dep = "$logDir/end.genotyping.OK";
     @cmd = ("$vt normalize -r $refGenomeFASTAFile $inputVCFFile -o + 2> $statsDir/all.normalize.log | $vt uniq + -o $outputVCFFile 2> $statsDir/all.uniq.log");
-    makeStep($tgt, $dep, @cmd);
+    makeJob($partition, $tgt, $dep, @cmd);
 
     $inputVCFFile = "$finalVCFOutDir/all.genotypes.vcf.gz";
     $tgt = "$inputVCFFile.tbi.OK";
     $dep = "$inputVCFFile.OK";
     @cmd = ("$vt index $inputVCFFile");
-    makeStep($tgt, $dep, @cmd);
+    makeJob($partition, $tgt, $dep, @cmd);
 
     $inputVCFFile = "$finalVCFOutDir/all.genotypes.vcf.gz";
     $outputVCFFile = "$finalVCFOutDir/all.sites.vcf.gz";
     $tgt = "$outputVCFFile.OK";
     $dep = "$inputVCFFile.OK";
     @cmd = ("$vt view -s $inputVCFFile -o $outputVCFFile");
-    makeStep($tgt, $dep, @cmd);
+    makeJob($partition, $tgt, $dep, @cmd);
 
     $inputVCFFile = "$finalVCFOutDir/all.sites.vcf.gz";
     $tgt = "$inputVCFFile.tbi.OK";
     $dep = "$inputVCFFile.OK";
     @cmd = ("$vt index $inputVCFFile");
-    makeStep($tgt, $dep, @cmd);
+    makeJob($partition, $tgt, $dep, @cmd);
 
     #********************************
     #log end time for normalizing VCF
@@ -395,30 +386,57 @@ close MAK;
 ##########
 #Functions
 ##########
-sub makeMos
-{
-    my $cmd = shift;
 
-    if ($cluster eq "main")
+#run a job either locally or by slurm
+sub makeJob
+{
+    my ($method, $tgt, $dep, @cmd) = @_;
+
+    if ($method eq "local")
     {
-        return ("mosbatch -E/tmp -i -r`$clusterDir/pick_main_node $sleep` /bin/bash -c 'set pipefail; $cmd'");
-    }
-    elsif ($cluster eq "mini")
-    {
-        return ("mosbatch -E/tmp -i -r`$clusterDir/pick_mini_node $sleep` /bin/bash -c 'set pipefail; $cmd'");
-    }
-    elsif ($cluster eq "mini+")
-    {
-        return ("mosbatch -E/tmp -i -r`$clusterDir/pick_mini+_node $sleep` /bin/bash -c 'set pipefail; $cmd'");
+        makeLocalStep($tgt, $dep, @cmd);
     }
     else
     {
-        print STDERR "$cluster not supported\n";
-        exit(1);
+        makeSlurm($partition, $tgt, $dep, @cmd);
     }
 }
 
-sub makeStep
+#run slurm jobs
+sub makeSlurm
+{
+    my ($partition, $tgt, $dep, @cmd) = @_;
+
+    push(@tgts, $tgt);
+    push(@deps, $dep);
+    my $cmd = "";
+    for my $c (@cmd)
+    {
+        #contains pipe
+        if ($c=~/\|/)
+        {
+            ++$slurmScriptNo;
+            my $slurmScriptFile = "$slurmScriptsDir/$slurmScriptNo.sh";
+            open(IN, ">$slurmScriptFile");
+            print IN "#!/bin/bash\n";
+            print IN "set -o pipefail; $c";
+            close(IN);
+            chmod(0755, $slurmScriptFile);
+
+            $cmd .= "\techo '" . $c . "'\n";
+            $cmd .= "\tsrun -p $partition $slurmScriptFile\n";
+        }
+        else
+        {
+            $cmd .= "\tsrun -p $partition " . $c . "\n";
+        }
+    }
+    $cmd .= "\ttouch $tgt\n";
+    push(@cmds, $cmd);
+}
+
+#run a local job
+sub makeLocalStep
 {
     my ($tgt, $dep, @cmd) = @_;
 
@@ -427,13 +445,14 @@ sub makeStep
     my $cmd = "";
     for my $c (@cmd)
     {
-        $cmd .= "\t" . makeMos($c) . "\n";
+        $cmd .= "\tset -o pipefail; " . $c . "\n";
     }
     $cmd .= "\ttouch $tgt\n";
     push(@cmds, $cmd);
 }
 
-sub makeLocalStep
+#run a local phony job
+sub makePhonyJob
 {
     my ($tgt, $dep, @cmd) = @_;
 
@@ -444,6 +463,5 @@ sub makeLocalStep
     {
         $cmd .= "\t" . $c . "\n";
     }
-    $cmd .= "\ttouch $tgt\n";
     push(@cmds, $cmd);
 }

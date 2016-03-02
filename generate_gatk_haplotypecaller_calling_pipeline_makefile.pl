@@ -55,7 +55,6 @@ if(!GetOptions ('h'=>\$help,
                 'm:s'=>\$makeFile,
                 'p:s'=>\$partition,
                 's:s'=>\$sampleFile,
-                'l:s'=>\$sequenceLengthFile,
                 'w:s'=>\$intervalWidth,
                 'r:s'=>\$refGenomeFASTAFile,
                 'j:s'=>\$jvmMemory,
@@ -88,7 +87,6 @@ printf("         make file               %s\n", $makeFile);
 printf("         partition               %s\n", $partition);
 printf("         slurm scripts sub dir   %s\n", $slurmScriptsSubDir);
 printf("         sample file             %s\n", $sampleFile);
-printf("         sequence length file    %s\n", $sequenceLengthFile);
 printf("         interval width          %s\n", $intervalWidth);
 printf("         reference               %s\n", $refGenomeFASTAFile);
 printf("         JVM Memory              %s\n", $jvmMemory);
@@ -159,7 +157,7 @@ if ($intervalWidth!=0)
     }
 
     mkpath("$outputDir/intervals/");
-    open(SQ,"$sequenceLengthFile") || die "Cannot open $sequenceLengthFile\n";
+    open(SQ,"$refGenomeFASTAFile.fai") || die "Cannot open $refGenomeFASTAFile.fai\n";
     while (<SQ>)
     {
         s/\r?\n?$//;
@@ -167,6 +165,8 @@ if ($intervalWidth!=0)
         {
             my ($chrom, $len) = split('\t', $_);
 
+            last if ($chrom=~/^GL/);
+            
             print "processing $chrom\t$len ";
 
             push(@CHROM, $chrom);
@@ -591,7 +591,24 @@ sub makeSlurm
     my $cmd = "";
     for my $c (@cmd)
     {
-        $cmd .= "\tsrun -p $partition " . $c . "\n";
+        #contains pipe
+        if ($c=~/\|/)
+        {
+            ++$slurmScriptNo;
+            my $slurmScriptFile = "$slurmScriptsDir/$slurmScriptNo.sh";
+            open(IN, ">$slurmScriptFile");
+            print IN "#!/bin/bash\n";
+            print IN "set -o pipefail; $c";
+            close(IN);
+            chmod(0755, $slurmScriptFile);
+
+            $cmd .= "\techo '" . $c . "'\n";
+            $cmd .= "\tsrun -p $partition $slurmScriptFile\n";
+        }
+        else
+        {
+            $cmd .= "\tsrun -p $partition " . $c . "\n";
+        }
     }
     $cmd .= "\ttouch $tgt\n";
     push(@cmds, $cmd);
@@ -607,7 +624,7 @@ sub makeLocalStep
     my $cmd = "";
     for my $c (@cmd)
     {
-        $cmd .= "\t" . $c . "\n";
+        $cmd .= "\tset -o pipefail; " . $c . "\n";
     }
     $cmd .= "\ttouch $tgt\n";
     push(@cmds, $cmd);
