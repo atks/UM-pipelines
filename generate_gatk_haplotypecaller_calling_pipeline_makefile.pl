@@ -35,7 +35,6 @@ my $help;
 
 my $outputDir = "";
 my $slurmScriptsSubDir = "";
-my $vtDir = "";
 my $makeFile = "Makefile";
 my $partition = "1000g";
 my $sampleFile = "";
@@ -44,7 +43,6 @@ my $sequenceLengthFile = "";
 my $intervalWidth = "";
 my $refGenomeFASTAFile = "";
 my $jvmMemory = "2g";
-my $rawCopy = 0;
 
 #initialize options
 Getopt::Long::Configure ('bundling');
@@ -57,8 +55,7 @@ if(!GetOptions ('h'=>\$help,
                 's:s'=>\$sampleFile,
                 'w:s'=>\$intervalWidth,
                 'r:s'=>\$refGenomeFASTAFile,
-                'j:s'=>\$jvmMemory,
-                'x'=>\$rawCopy
+                'j:s'=>\$jvmMemory
                 )
   || !defined($outputDir)
   || !defined($makeFile)
@@ -77,7 +74,7 @@ if(!GetOptions ('h'=>\$help,
 
 #programs
 #you can set the  maximum memory here to be whatever you want
-my $gatk = "/net/fantasia/home/atks/dev/vt/comparisons/programs/jdk1.7.0_25/bin/java -jar -Xmx$jvmMemory /net/fantasia/home/atks/programs/GenomeAnalysisTK-3.4-46/GenomeAnalysisTK.jar";
+my $gatk = "/net/fantasia/home/atks/dev/vt/comparisons/programs/jdk1.7.0_25/bin/java -jar -Xmx$jvmMemory /net/fantasia/home/atks/programs/GenomeAnalysisTK-3.5/GenomeAnalysisTK.jar";
 my $vt = "/net/fantasia/home/atks/dev/vt/comparisons/programs/vt/vt";
 
 printf("generate_gatk_haplotypecaller_pipeline_makefile.pl\n");
@@ -90,7 +87,6 @@ printf("         sample file             %s\n", $sampleFile);
 printf("         interval width          %s\n", $intervalWidth);
 printf("         reference               %s\n", $refGenomeFASTAFile);
 printf("         JVM Memory              %s\n", $jvmMemory);
-printf("         raw Copy                %s\n", $rawCopy);
 printf("\n");
 
 my $vcfOutDir = "$outputDir/vcf";
@@ -105,11 +101,7 @@ my $statsDir = "$outputDir/stats";
 mkpath($statsDir);
 my $slurmScriptsDir = "$outputDir/slurm_scripts/$slurmScriptsSubDir";
 mkpath($slurmScriptsDir);
-my $rawCopyDir = "$outputDir/raw";
-if ($rawCopy)
-{
-    mkpath($rawCopyDir);
-}
+
 my $logFile = "$outputDir/run.log";
 
 ########################################

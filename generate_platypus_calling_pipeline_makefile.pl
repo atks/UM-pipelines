@@ -34,14 +34,12 @@ This script generates the make file to discovery and genotype a set of individua
 my $help;
 
 my $outputDir = "";
-my $makeFile = "Makefile";
-my $partition = "main";
+my $makeFile = "";
+my $partition = "local";
 my $slurmScriptsSubDir = "";
 my $sampleFile = "";
-my $intervals = "";
 my $intervalWidth = "";
 my $refGenomeFASTAFile = "";
-my $rawCopy = 0;
 
 #initialize options
 Getopt::Long::Configure ('bundling');
@@ -84,13 +82,10 @@ printf("         slurm scripts sub dir   %s\n", $slurmScriptsSubDir);
 printf("         sample file             %s\n", $sampleFile);
 printf("         interval width          %s\n", $intervalWidth);
 printf("         reference               %s\n", $refGenomeFASTAFile);
-printf("         Raw Copy                %s\n", $rawCopy);
 printf("\n");
 
-my $vcfOutDir = "$outputDir/vcf";
-mkpath($vcfOutDir);
-my $finalVCFOutDir = "$outputDir/final";
-mkpath($finalVCFOutDir);
+my $finalDir = "$outputDir/final";
+mkpath($finalDir);
 my $statsDir = "$outputDir/stats";
 mkpath($statsDir);
 my $auxDir = "$outputDir/aux";
@@ -100,6 +95,7 @@ mkpath($slurmScriptsDir);
 my $slurmScriptNo = 0;
 my $logDir = "$outputDir/log";
 mkpath($logDir);
+
 my $logFile = "$outputDir/run.log";
 
 ########################################
@@ -141,6 +137,8 @@ while (<SQ>)
     {
         my ($chrom, $len) = split('\t', $_);
 
+        last if ($chrom=~/^GL/);
+
         print "processing $chrom\t$len ";
 
         push(@CHROM, $chrom);
@@ -170,7 +168,7 @@ while (<SQ>)
             push(@{$intervalsByChrom{$chrom}}, "$intervalName");
             push(@intervals, $interval);
             push(@intervalNames, $intervalName);
-            
+
             $count++;
         }
 
@@ -179,7 +177,6 @@ while (<SQ>)
 }
 close(SQ);
 
-
 my @tgts = ();
 my @deps = ();
 my @cmds = ();
@@ -187,6 +184,7 @@ my $tgt;
 my $dep;
 my @cmd;
 my $inputVCFFile;
+my $inputVCFFiles;
 my $outputVCFFile;
 
 ########
@@ -208,27 +206,25 @@ my $contigsFile = "/net/fantasia/home/atks/dev/vt/comparisons/NA12878/indices/co
 for my $i (0..$#intervals)
 {
     my $interval = $intervals[$i];
-    my $intervalName = $intervalNames[$i];        
-    $outputVCFFile = "$vcfOutDir/$intervalName.genotypes.vcf";
+    my $intervalName = $intervalNames[$i];
+    $outputVCFFile = "$auxDir/$intervalName.genotypes.vcf";
     $tgt = "$outputVCFFile.OK";
     $dep = "";
     @cmd = ("$platypus callVariants --bamFiles=$bamFiles --refFile=$refGenomeFASTAFile --output=$outputVCFFile --regions=$interval");
     makeJob($partition, $tgt, $dep, @cmd);
-    
-    $tgt = "$outputVCFFile.hdr.OK";
-    $dep = "$outputVCFFile.OK";
-    @cmd = ("$injectContigs -v $outputVCFFile -c $contigsFile");
+
+    $inputVCFFile = "$auxDir/$intervalName.genotypes.vcf";
+    $tgt = "$inputVCFFile.hdr.OK";
+    $dep = "$inputVCFFile.OK";
+    @cmd = ("$injectContigs -v $inputVCFFile -c $contigsFile");
     makeJob($partition, $tgt, $dep, @cmd);
-        
-    $intervalVCFFiles .= " $outputVCFFile";
-    $intervalVCFFileHdrsOK .= " $outputVCFFile.hdr.OK";
 }
 
 #************************
 #log end time for calling
 #************************
 $tgt = "$logDir/end.calling.OK";
-$dep = "$intervalVCFFileHdrsOK";
+$dep = join(" ", map {"$auxDir/$_.genotypes.vcf.gz.hdr.OK"} @intervalNames);
 @cmd = ("date | awk '{print \"end calling: \"\$\$0}' >> $logFile");
 makeLocalStep($tgt, $dep, @cmd);
 
@@ -236,12 +232,12 @@ makeLocalStep($tgt, $dep, @cmd);
 #Concatenate, normalize and drop duplicates
 ###########################################
 
-#*************************************************
-#log start time for concating and normalizing VCFs
-#*************************************************
-$tgt = "$logDir/start.concatenation.normalization.OK";
+#*************************************
+#log start time for concatenating VCFs
+#*************************************
+$tgt = "$logDir/start.concatenation.OK";
 $dep = "$logDir/end.calling.OK";
-@cmd = ("date | awk '{print \"start concatenating and normalizing: \"\$\$0}' >> $logFile");
+@cmd = ("date | awk '{print \"start concatenating: \"\$\$0}' >> $logFile");
 makeLocalStep($tgt, $dep, @cmd);
 
 for my $chrom (@CHROM)
@@ -250,12 +246,11 @@ for my $chrom (@CHROM)
     open(OUT,">$vcfListFile") || die "Cannot open $vcfListFile\n";
     for my $interval (@{$intervalsByChrom{$chrom}})
     {
-        print OUT "$vcfOutDir/$interval.genotypes.vcf\n";
+        print OUT "$auxDir/$interval.genotypes.vcf\n";
     }
     close(OUT);
-    
-    #genotypes VCFs
-    $outputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
+
+    $outputVCFFile = "$finalDir/$chrom.genotypes.vcf.gz";
     $tgt = "$outputVCFFile.OK";
     $dep = "$logDir/end.calling.OK";
     @cmd = ("$vt cat -L $vcfListFile -o + -w 1000 | $vt uniq - -o $outputVCFFile 2> $statsDir/$chrom.uniq.log");
@@ -265,30 +260,29 @@ for my $chrom (@CHROM)
     $dep = "$outputVCFFile.OK";
     @cmd = ("$vt index $outputVCFFile");
     makeJob($partition, $tgt, $dep, @cmd);
-
-    #sites VCFs
-    $inputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
-    $outputVCFFile = "$finalVCFOutDir/$chrom.sites.vcf.gz";
-    $tgt = "$outputVCFFile.OK";
-    $dep = "$inputVCFFile.OK";
-    @cmd = ("$vt view -s $inputVCFFile -o $outputVCFFile");
-    makeJob($partition, $tgt, $dep, @cmd);
-
-    $tgt = "$outputVCFFile.tbi.OK";
-    $dep = "$outputVCFFile.OK";
-    @cmd = ("$vt index $inputVCFFile");
-    makeJob($partition, $tgt, $dep, @cmd);
 }
 
-my $inputVCFFiles = join(" ", map {"$finalVCFOutDir/$_.sites.vcf.gz"} @CHROM);
-my $inputVCFFilesOK = join(" ", map {"$finalVCFOutDir/$_.sites.vcf.gz.OK"} @CHROM);
-$outputVCFFile = "$finalVCFOutDir/all.sites.vcf.gz";
+$inputVCFFiles = join(" ", map {"$finalDir/$_.genotypes.vcf.gz"} (1..22,"X","Y","MT"));
+$outputVCFFile = "$finalDir/all.genotypes.vcf.gz";
 $tgt = "$outputVCFFile.OK";
-$dep = "$inputVCFFilesOK";
+$dep = join(" ", map {"$finalDir/$_.genotypes.vcf.gz.OK"} (1..22,"X","Y","MT"));
 @cmd = ("$vt cat $inputVCFFiles -o $outputVCFFile");
 makeJob($partition, $tgt, $dep, @cmd);
 
-$inputVCFFile = "$finalVCFOutDir/all.sites.vcf.gz";
+$inputVCFFile = "$finalDir/all.genotypes.vcf.gz";
+$tgt = "$inputVCFFile.tbi.OK";
+$dep = "$inputVCFFile.OK";
+@cmd = ("$vt index $inputVCFFile");
+makeJob($partition, $tgt, $dep, @cmd);
+
+$inputVCFFile = "$finalDir/all.genotypes.vcf.gz";
+$outputVCFFile = "$finalDir/all.sites.vcf.gz";
+$tgt = "$outputVCFFile.OK";
+$dep = "$inputVCFFile.OK";
+@cmd = ("$vt view -s  $inputVCFFile -o $outputVCFFile");
+makeJob($partition, $tgt, $dep, @cmd);
+
+$inputVCFFile = "$finalDir/all.sites.vcf.gz";
 $tgt = "$inputVCFFile.tbi.OK";
 $dep = "$inputVCFFile.OK";
 @cmd = ("$vt index $inputVCFFile");
@@ -298,10 +292,10 @@ makeJob($partition, $tgt, $dep, @cmd);
 #log end time for concatenating and normalizing VCFs
 #***************************************************
 $tgt = "$logDir/end.concatenation.normalization.OK";
-$dep = "$finalVCFOutDir/all.sites.vcf.gz.tbi.OK";
+$dep = "$finalDir/all.sites.vcf.gz.tbi.OK";
 @cmd = ("date | awk '{print \"end concat and normalize: \"\$\$0}' >> $logFile");
 makeLocalStep($tgt, $dep, @cmd);
- 
+
 #*******************
 #Write out make file
 #*******************
@@ -312,7 +306,7 @@ print MAK "all: @tgts\n\n";
 #clean
 push(@tgts, "clean");
 push(@deps, "");
-push(@cmds, "\t-rm -rf $outputDir/*.* $vcfOutDir/*.* $vcfOutDir/*/*.* $finalVCFOutDir/*.* $statsDir/* $logDir/* $outputDir/intervals/*.*");
+push(@cmds, "\t-rm -rf $outputDir/*.* $auxDir/*.* $finalDir/*.* $statsDir/* $logDir/* $outputDir/intervals/*.*");
 
 for(my $i=0; $i < @tgts; ++$i) {
     print MAK "$tgts[$i]: $deps[$i]\n";

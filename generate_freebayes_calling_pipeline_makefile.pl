@@ -33,13 +33,10 @@ This script generates the make file to discovery and genotype a set of individua
 
 my $help;
 
-my $workDir = "";
 my $outputDir = "run";
 my $makeFile = "Makefile";
 my $partition = "local";
-my $sleep = 0;
 my $sampleFile = "";
-my $intervals = "";
 my $intervalWidth = 1000000;
 my $refGenomeFASTAFile = "";
 my $slurmScriptsSubDir = "";
@@ -50,16 +47,13 @@ my $slurmScriptNo = 0;
 Getopt::Long::Configure ('bundling');
 
 if(!GetOptions ('h'=>\$help,
-                'w:s'=>\$workDir,
                 'o:s'=>\$outputDir,
                 'm:s'=>\$makeFile,
                 'p:s'=>\$partition,
-                'd:s'=>\$sleep,
                 's:s'=>\$sampleFile,
                 'i:s'=>\$intervalWidth,
                 'r:s'=>\$refGenomeFASTAFile
                 )
-  || !defined($workDir)
   || !defined($makeFile)
   || !defined($sampleFile)
   || !defined($refGenomeFASTAFile))
@@ -83,8 +77,7 @@ my $contigsFile = "/net/fantasia/home/atks/dev/vt/comparisons/NA12878/indices/co
 
 printf("generate_freebayes_calling_pipeline_makefile.pl\n");
 printf("\n");
-printf("options: work dir             %s\n", $workDir);
-printf("         out dir              %s\n", $outputDir);
+printf("options: output dir           %s\n", $outputDir);
 printf("         vt path              %s\n", $vt);
 printf("         make file            %s\n", $makeFile);
 printf("         sample file          %s\n", $sampleFile);
@@ -145,7 +138,7 @@ while (<SQ>)
     s/\r?\n?$//;
     if(!/^#/)
     {
-        my ($chrom, $len, $offset, $others) = split('\t', $_);
+        my ($chrom, $len, $offset, $others) = split('\t');
 
         last if ($chrom=~/^GL/);
             
@@ -242,7 +235,7 @@ makeLocalStep($tgt, $dep, @cmd);
 #**************
 #log start time
 #**************
-$tgt = "$logDir/start.concatenating.normalizing.OK";
+$tgt = "$logDir/start.concatenatingOK";
 $dep = "$logDir/end.calling.OK";
 @cmd = ("date | awk '{print \"start concatenating and normalizing: \"\$\$0}' >> $logFile");
 makeLocalStep($tgt, $dep, @cmd);
@@ -292,7 +285,7 @@ makeJob($partition, $tgt, $dep, @cmd);
 #************
 #log end time
 #************
-$tgt = "$logDir/end.concatenating.normalizing.OK";
+$tgt = "$logDir/end.concatenating.OK";
 $dep = "$finalDir/all.sites.vcf.gz.tbi.OK";
 @cmd = ("date | awk '{print \"end concatenating and normalizing: \"\$\$0}' >> $logFile");
 makeLocalStep($tgt, $dep, @cmd);
