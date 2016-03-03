@@ -40,7 +40,6 @@ my $makeFile;
 my $cluster;
 my $sleep;
 my $fastqListFile;
-my $sequenceLengthFile;
 my $intervalWidth = 1000000;
 my $refGenomeFASTAFile;
 my $variantType;
@@ -168,13 +167,13 @@ my @intervalNames = ();
 my @intervalFiles = ();
 my @CHROM = ();
 
-open(SQ,"$sequenceLengthFile") || die "Cannot open $sequenceLengthFile\n";
+open(SQ,"$refGenomeFASTAFile.fai") || die "Cannot open $refGenomeFASTAFile.fai\n";
 while (<SQ>)
 {
     s/\r?\n?$//;
     if(!/^#/)
     {
-        my ($chrom, $len) = split('\t', $_);
+        my ($chrom, $len, $offset, $others) = split('\t', $_);
 
         print "processing $chrom\t$len ";
 
@@ -332,7 +331,6 @@ $dep = "$inputVCFFile.OK";
 makeStep($tgt, $dep, @cmd);
 
 #add post processing to add sequences, fix chromosome names (should be fixed based on resource files), REF not to be empty and sorting of sequences.
-
 
 #*****************************
 #log end time for allelotyping
