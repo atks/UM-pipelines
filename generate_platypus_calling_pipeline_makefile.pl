@@ -207,13 +207,13 @@ for my $i (0..$#intervals)
 {
     my $interval = $intervals[$i];
     my $intervalName = $intervalNames[$i];
-    $outputVCFFile = "$auxDir/$intervalName.genotypes.vcf";
+    $outputVCFFile = "$auxDir/$intervalName.genotypes.vcf.gz";
     $tgt = "$outputVCFFile.OK";
     $dep = "";
     @cmd = ("$platypus callVariants --bamFiles=$bamFiles --refFile=$refGenomeFASTAFile --output=$outputVCFFile --regions=$interval");
     makeJob($partition, $tgt, $dep, @cmd);
 
-    $inputVCFFile = "$auxDir/$intervalName.genotypes.vcf";
+    $inputVCFFile = "$auxDir/$intervalName.genotypes.vcf.gz";
     $tgt = "$inputVCFFile.hdr.OK";
     $dep = "$inputVCFFile.OK";
     @cmd = ("$injectContigs -v $inputVCFFile -c $contigsFile");
@@ -246,7 +246,7 @@ for my $chrom (@CHROM)
     open(OUT,">$vcfListFile") || die "Cannot open $vcfListFile\n";
     for my $interval (@{$intervalsByChrom{$chrom}})
     {
-        print OUT "$auxDir/$interval.genotypes.vcf\n";
+        print OUT "$auxDir/$interval.genotypes.vcf.gz\n";
     }
     close(OUT);
 
