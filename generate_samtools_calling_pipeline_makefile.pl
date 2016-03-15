@@ -71,8 +71,8 @@ if(!GetOptions ('h'=>\$help,
 
 #programs
 #you can set the  maximum memory here to be whatever you want
-my $samtools = "/net/fantasia/home/atks/dev/vt/comparisons/programs/samtools/samtools";
-my $bcftools = "/net/fantasia/home/atks/dev/vt/comparisons/programs/bcftools/bcftools";
+my $samtools = "/net/fantasia/home/atks/dev/vt/comparisons/programs/samtools-1.3-20-gd49c73b/samtools";
+my $bcftools = "/net/fantasia/home/atks/dev/vt/comparisons/programs/bcftools-1.3-32-gafecb4e/bcftools";
 my $vt = "/net/fantasia/home/atks/dev/vt/comparisons/programs/vt/vt";
 
 printf("generate_samtools_calling_pipeline_makefile.pl\n");

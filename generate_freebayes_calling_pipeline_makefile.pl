@@ -70,7 +70,7 @@ if(!GetOptions ('h'=>\$help,
 
 #programs
 #you can set the  maximum memory here to be whatever you want
-my $freebayes = "/net/fantasia/home/atks/dev/vt/comparisons/programs/freebayes/bin/freebayes";
+my $freebayes = "/net/fantasia/home/atks/dev/vt/comparisons/programs/freebayes/bin/freebayes-1.0.2-6-g3ce827d";
 my $vt = "/net/fantasia/home/atks/dev/vt/comparisons/programs/vt/vt";
 my $injectContigs = "/net/fantasia/home/atks/dev/vt/comparisons/programs/scripts/inject_contigs";
 my $contigsFile = "/net/fantasia/home/atks/dev/vt/comparisons/NA12878/indices/contigs.txt";
