@@ -36,7 +36,7 @@ my $help;
 my $outputDir;
 my $makeFile;
 my $partition;
-my $slurmScriptsSubDir;
+my $slurmScriptsSubDir = "";
 my $sampleFile;
 my $intervalWidth = 1000000;
 my $refGenomeFASTAFile;
@@ -50,11 +50,9 @@ if(!GetOptions ('h'=>\$help,
                 'p:s'=>\$partition,
                 'd:s'=>\$slurmScriptsSubDir,
                 's:s'=>\$sampleFile,
-                'l:s'=>\$sequenceLengthFile,
                 'i:s'=>\$intervalWidth,
-                'r:s'=>\$refGenomeFASTAFile,
-                'x'=>\$rawCopy
-                )
+                'r:s'=>\$refGenomeFASTAFile
+               )
   || !defined($makeFile)
   || !defined($sampleFile)
   || !defined($refGenomeFASTAFile))
@@ -141,6 +139,8 @@ while (<SQ>)
     if(!/^#/)
     {
         my ($chrom, $len) = split('\t', $_);
+
+        last if ($chrom=~/^GL/);
 
         print "processing $chrom\t$len ";
 

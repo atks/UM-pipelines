@@ -39,7 +39,6 @@ my $makeFile = "Makefile";
 my $partition = "1000g";
 my $sampleFile = "";
 my $intervals = "";
-my $sequenceLengthFile = "";
 my $intervalWidth = "";
 my $refGenomeFASTAFile = "";
 my $jvmMemory = "2g";
@@ -53,7 +52,7 @@ if(!GetOptions ('h'=>\$help,
                 'm:s'=>\$makeFile,
                 'p:s'=>\$partition,
                 's:s'=>\$sampleFile,
-                'w:s'=>\$intervalWidth,
+                'i:s'=>\$intervalWidth,
                 'r:s'=>\$refGenomeFASTAFile,
                 'j:s'=>\$jvmMemory
                 )
@@ -74,7 +73,7 @@ if(!GetOptions ('h'=>\$help,
 
 #programs
 #you can set the  maximum memory here to be whatever you want
-my $gatk = "/net/fantasia/home/atks/dev/vt/comparisons/programs/jdk1.7.0_25/bin/java -jar -Xmx$jvmMemory /net/fantasia/home/atks/programs/GenomeAnalysisTK-3.5/GenomeAnalysisTK.jar";
+my $gatk = "/net/fantasia/home/atks/dev/vt/comparisons/programs/jdk1.7.0_25/bin/java -jar -Xmx$jvmMemory /net/fantasia/home/atks/dev/vt/comparisons/programs/GenomeAnalysisTK-3.5/GenomeAnalysisTK.jar";
 my $vt = "/net/fantasia/home/atks/dev/vt/comparisons/programs/vt/vt";
 
 printf("generate_gatk_haplotypecaller_pipeline_makefile.pl\n");
@@ -101,6 +100,7 @@ my $statsDir = "$outputDir/stats";
 mkpath($statsDir);
 my $slurmScriptsDir = "$outputDir/slurm_scripts/$slurmScriptsSubDir";
 mkpath($slurmScriptsDir);
+my $slurmScriptNo = 0;
 
 my $logFile = "$outputDir/run.log";
 
@@ -242,7 +242,7 @@ for my $interval (@intervals)
     for my $sampleID (@sample)
     {
         mkpath("$vcfOutDir/$sampleID");
-        $outputVCFFile = "$vcfOutDir/$sampleID/$sampleID.$interval.vcf";
+        $outputVCFFile = "$vcfOutDir/$sampleID/$interval.vcf.gz";
         $tgt = "$outputVCFFile.OK";
         $dep = "";
         @cmd = ("$gatk -T HaplotypeCaller -R $refGenomeFASTAFile -I $SAMPLE{$sampleID} " .
@@ -340,10 +340,10 @@ makeJob("local", $tgt, $dep, @cmd);
 #Concatenate, normalize and drop duplicates
 ###########################################
 
-#*************************************************
-#log start time for concating and normalizing VCFs
-#*************************************************
-$tgt = "$logDir/start.concatenation.normalization.OK";
+#*********************************
+#log start time for concating VCFs
+#*********************************
+$tgt = "$logDir/start.concatenation.OK";
 $dep = "$logDir/end.genotyping.OK";
 @cmd = ("date | awk '{print \"start concat and normalize: \"\$\$0}' >> $logFile");
 makeJob("local", $tgt, $dep, @cmd);
@@ -362,7 +362,7 @@ for my $chrom (@CHROM)
 
     $outputVCFFile = "$finalVCFOutDir/$chrom.genotypes.vcf.gz";
     $tgt = "$outputVCFFile.OK";
-    $dep = "$logDir/start.concatenation.normalization.OK";
+    $dep = "$logDir/start.concatenation.OK";
     @cmd = ("$vt cat -L $vcfListFile -o + -w 1000 | $vt uniq + -o $outputVCFFile 2> $statsDir/$chrom.uniq.log");
     makeJob($partition, $tgt, $dep, @cmd);
 
