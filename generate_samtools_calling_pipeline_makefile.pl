@@ -272,8 +272,22 @@ for my $chrom (@CHROM)
     makeJob($partition, $tgt, $dep, @cmd);
 }
 
-my $inputVCFFiles = join(" ", map {"$finalVCFOutDir/$_.sites.vcf.gz"} @CHROM);
-my $inputVCFFilesOK = join(" ", map {"$finalVCFOutDir/$_.sites.vcf.gz.OK"} @CHROM);
+my $inputVCFFiles = join(" ", map {"$finalVCFOutDir/$_.genotypes.vcf.gz"} @CHROM);
+my $inputVCFFilesOK = join(" ", map {"$finalVCFOutDir/$_.genotypes.vcf.gz.OK"} @CHROM);
+$outputVCFFile = "$finalVCFOutDir/all.genotypes.vcf.gz";
+$tgt = "$outputVCFFile.OK";
+$dep = $inputVCFFilesOK;
+@cmd = ("$vt cat $inputVCFFiles -o $outputVCFFile");
+makeJob($partition, $tgt, $dep, @cmd);
+
+$inputVCFFile = "$finalVCFOutDir/all.genotypes.vcf.gz";
+$tgt = "$inputVCFFile.tbi.OK";
+$dep = "$inputVCFFile.OK";
+@cmd = ("$vt index $inputVCFFile");
+makeJob($partition, $tgt, $dep, @cmd);
+
+$inputVCFFiles = join(" ", map {"$finalVCFOutDir/$_.sites.vcf.gz"} @CHROM);
+$inputVCFFilesOK = join(" ", map {"$finalVCFOutDir/$_.sites.vcf.gz.OK"} @CHROM);
 $outputVCFFile = "$finalVCFOutDir/all.sites.vcf.gz";
 $tgt = "$outputVCFFile.OK";
 $dep = $inputVCFFilesOK;

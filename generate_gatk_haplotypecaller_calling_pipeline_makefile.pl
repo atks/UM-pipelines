@@ -73,7 +73,10 @@ if(!GetOptions ('h'=>\$help,
 
 #programs
 #you can set the  maximum memory here to be whatever you want
-my $gatk = "/net/fantasia/home/atks/dev/vt/comparisons/programs/jdk1.7.0_25/bin/java -jar -Xmx$jvmMemory /net/fantasia/home/atks/dev/vt/comparisons/programs/GenomeAnalysisTK-3.5/GenomeAnalysisTK.jar";
+my $gatk = "/net/fantasia/home/atks/dev/vt/comparisons/programs/jdk1.7.0_25/bin/java -jar -Xmx$jvmMemory " .
+           "/net/fantasia/home/atks/dev/vt/comparisons/programs/GenomeAnalysisTK-3.5/GenomeAnalysisTK.jar";
+my $java = "/net/fantasia/home/atks/dev/vt/comparisons/programs/jdk1.7.0_25/bin/java -jar -Xmx$jvmMemory";
+my $gatkJar = "/net/fantasia/home/atks/dev/vt/comparisons/programs/GenomeAnalysisTK-3.5/GenomeAnalysisTK.jar";
 my $vt = "/net/fantasia/home/atks/dev/vt/comparisons/programs/vt/vt";
 
 printf("generate_gatk_haplotypecaller_pipeline_makefile.pl\n");
@@ -245,7 +248,7 @@ for my $interval (@intervals)
         $outputVCFFile = "$vcfOutDir/$sampleID/$interval.vcf.gz";
         $tgt = "$outputVCFFile.OK";
         $dep = "";
-        @cmd = ("$gatk -T HaplotypeCaller -R $refGenomeFASTAFile -I $SAMPLE{$sampleID} " .
+        @cmd = ("$java -Djava.io.tmpdir=$vcfOutDir/$sampleID $gatkJar -T HaplotypeCaller -R $refGenomeFASTAFile -I $SAMPLE{$sampleID} " .
                 "--emitRefConfidence GVCF --variant_index_type LINEAR --variant_index_parameter 128000 " .
                 "-L $outputDir/intervals/$interval.interval_list " .
                 "-o $outputVCFFile");
@@ -288,7 +291,7 @@ for my $interval (@intervals)
     $outputVCFFile = "$vcfOutDir/$interval.vcf";
     $tgt = "$outputVCFFile.OK";
     $dep = "$logDir/start.combining_gvcfs.OK";;
-    @cmd = ("$gatk -T CombineGVCFs -R $refGenomeFASTAFile -V $gvcfListFile -o $outputVCFFile");
+    @cmd = ("$java -Djava.io.tmpdir=$vcfOutDir $gatkJar -T CombineGVCFs -R $refGenomeFASTAFile -V $gvcfListFile -o $outputVCFFile");
     makeJob($partition, $tgt, $dep, @cmd);
 
     $mergedVCFFilesOK .= " $outputVCFFile.OK";
@@ -356,7 +359,7 @@ for my $chrom (@CHROM)
     open(OUT,">$vcfListFile") || die "Cannot open $vcfListFile\n";
     for my $interval (@{$intervalsByChrom{$chrom}})
     {
-        print OUT "$vcfOutDir/$interval.genotypes.vcf\n";
+        print OUT "$vcfOutDir/$interval.genotypes.vcf.gz\n";
     }
     close(OUT);
 
@@ -386,8 +389,22 @@ for my $chrom (@CHROM)
     makeJob($partition, $tgt, $dep, @cmd);
 }
 
-my $inputVCFFiles = join(" ", map {"$finalVCFOutDir/$_.sites.vcf.gz"} @CHROM);
-my $inputVCFFilesOK = join(" ", map {"$finalVCFOutDir/$_.sites.vcf.gz.OK"} @CHROM);
+my $inputVCFFiles = join(" ", map {"$finalVCFOutDir/$_.genotypes.vcf.gz"} @CHROM);
+my $inputVCFFilesOK = join(" ", map {"$finalVCFOutDir/$_.genotypes.vcf.gz.OK"} @CHROM);
+$outputVCFFile = "$finalVCFOutDir/all.genotypes.vcf.gz";
+$tgt = "$outputVCFFile.OK";
+$dep = "$inputVCFFilesOK";
+@cmd = ("$vt cat $inputVCFFiles -o $outputVCFFile");
+makeJob($partition, $tgt, $dep, @cmd);
+
+$inputVCFFile = "$finalVCFOutDir/all.genotypes.vcf.gz";
+$tgt = "$inputVCFFile.tbi.OK";
+$dep = "$inputVCFFile.OK";
+@cmd = ("$vt index $inputVCFFile");
+makeJob($partition, $tgt, $dep, @cmd);
+
+$inputVCFFiles = join(" ", map {"$finalVCFOutDir/$_.sites.vcf.gz"} @CHROM);
+$inputVCFFilesOK = join(" ", map {"$finalVCFOutDir/$_.sites.vcf.gz.OK"} @CHROM);
 $outputVCFFile = "$finalVCFOutDir/all.sites.vcf.gz";
 $tgt = "$outputVCFFile.OK";
 $dep = "$inputVCFFilesOK";
@@ -400,9 +417,9 @@ $dep = "$inputVCFFile.OK";
 @cmd = ("$vt index $inputVCFFile");
 makeJob($partition, $tgt, $dep, @cmd);
 
-#***********************************************
-#log end time for concating and normalizing VCFs
-#***********************************************
+#***********************************
+#log end time for concatenating VCFs
+#***********************************
 my $inputVCFFileIndicesOK = join(" ", map {"$finalVCFOutDir/$_.sites.vcf.gz.tbi.OK"} @CHROM);
 $tgt = "$logDir/end.concatenation.normalization.OK";
 $dep = "$inputVCFFileIndicesOK";

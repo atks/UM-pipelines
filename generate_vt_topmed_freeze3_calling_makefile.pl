@@ -10,11 +10,11 @@ use Pod::Usage;
 
 =head1 NAME
 
-generate_vt_topmed_freeze2_calling_makefile.pl
+generate_vt_topmed_freeze3_calling_makefile.pl
 
 =head1 SYNOPSIS
 
- generate_vt_topmed_freeze2_calling_makefile.pl [options]
+ generate_vt_topmed_freeze3_calling_makefile.pl [options]
 
   -s     sample file list giving the location of each sample
          column 1: sample name
@@ -312,7 +312,8 @@ for my $i (0 .. $#intervals)
         $outputVCFFile = "$individualDir/$sampleID/$intervalNames[$i].genotypes.bcf";
         $tgt = "$outputVCFFile.OK";
         $dep = "$inputVCFFile.OK";
-        @cmd = ("REF_PATH=/dept/csg/topmed/working/mktrost/gotcloud.ref/md5/%2s/%2s/%s; $vt genotype2 $inputVCFFile -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -i $intervals[$i] -o $outputVCFFile 2> $individualDir/$sampleID/$intervalNames[$i].genotype2.log");
+#        @cmd = ("REF_PATH=/dept/csg/topmed/working/mktrost/gotcloud.ref/md5/%2s/%2s/%s; $vt genotype2 $inputVCFFile -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -i $intervals[$i] -o $outputVCFFile 2> $individualDir/$sampleID/$intervalNames[$i].genotype2.log");
+        @cmd = ("$vt genotype2 $inputVCFFile -b $BAMFILE{$sampleID} -r $refGenomeFASTAFile -s $sampleID -i $intervals[$i] -o $outputVCFFile 2> $individualDir/$sampleID/$intervalNames[$i].genotype2.log");
         makeJob($partition, $tgt, $dep, @cmd);
 
         $inputVCFFile = "$individualDir/$sampleID/$intervalNames[$i].genotypes.bcf";
